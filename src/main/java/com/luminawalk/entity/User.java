@@ -9,14 +9,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
-/**
- * <p>
- * 
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
- */
+
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
@@ -42,9 +35,14 @@ public class User implements Serializable {
     private String password;
 
     /**
-     * 昵称，默认是用户id
+     * 昵称，默认是随机字符
      */
     private String nickName;
+
+    /**
+     * 用户头像
+     */
+    private String icon;
 
     /**
      * 创建时间

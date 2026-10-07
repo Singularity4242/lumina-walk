@@ -9,14 +9,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
-/**
- * <p>
- * 
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
- */
+
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
@@ -37,9 +30,14 @@ public class ShopType implements Serializable {
     private String name;
 
     /**
+     * 图标
+     */
+    private String icon;
+
+    /**
      * 顺序
      */
-    private Integer order;
+    private Integer sort;
 
     /**
      * 创建时间

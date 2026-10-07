@@ -1,7 +1,10 @@
 package com.luminawalk.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.IdType;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import com.baomidou.mybatisplus.annotation.TableId;
 import java.io.Serializable;
@@ -9,14 +12,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
-/**
- * <p>
- * 
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
- */
+
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
@@ -59,17 +55,17 @@ public class Shop implements Serializable {
     /**
      * 经度
      */
-    private Double x;
+    private BigDecimal x;
 
     /**
      * 维度
      */
-    private Double y;
+    private BigDecimal y;
 
     /**
      * 均价，取整数
      */
-    private Long avgPrice;
+    private Integer avgPrice;
 
     /**
      * 销量
@@ -101,5 +97,7 @@ public class Shop implements Serializable {
      */
     private LocalDateTime updateTime;
 
+    @TableField(exist = false)
+    private Double distance;  //距离，动态计算
 
 }

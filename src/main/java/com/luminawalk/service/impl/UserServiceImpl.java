@@ -4,17 +4,15 @@ import com.luminawalk.entity.User;
 import com.luminawalk.mapper.UserMapper;
 import com.luminawalk.service.IUserService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-/**
- * <p>
- *  服务实现类
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
- */
+import javax.annotation.Resource;
+
+
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
 
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 }

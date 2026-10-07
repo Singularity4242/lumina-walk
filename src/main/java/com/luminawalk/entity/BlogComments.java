@@ -9,14 +9,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
-/**
- * <p>
- * 
- * </p>
- *
- * @author 虎哥
- * @since 2021-12-22
- */
+
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
@@ -64,7 +57,7 @@ public class BlogComments implements Serializable {
     /**
      * 状态，0：正常，1：被举报，2：禁止查看
      */
-    private Boolean status;
+    private Integer status;
 
     /**
      * 创建时间

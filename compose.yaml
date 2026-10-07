@@ -1,0 +1,32 @@
+name: luminawalk
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: luminawalk-mysql
+
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: luminawalk
+      MYSQL_USER: luminawalk
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+
+    ports:
+      - "127.0.0.1:3306:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  mysql_data:
