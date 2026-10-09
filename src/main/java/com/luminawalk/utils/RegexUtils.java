@@ -1,5 +1,5 @@
 package com.luminawalk.utils;
-import org.apache.commons.lang3.StringUtils;
+import cn.hutool.core.util.StrUtil;
 
 //正则表达式校验
 public class RegexUtils {
@@ -54,7 +54,7 @@ public class RegexUtils {
 
     // 校验是否不符合正则格式
     private static boolean mismatch(String str, String regex){
-        if (StringUtils.isBlank(str)) {
+        if (StrUtil.isBlank(str)) {
             return true;
         }
         return !str.matches(regex);
