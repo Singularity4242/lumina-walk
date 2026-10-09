@@ -176,3 +176,64 @@ CREATE TABLE tb_voucher_order (
                                   CONSTRAINT ck_order_use_time CHECK (use_time IS NULL OR (pay_time IS NOT NULL AND use_time >= pay_time)),
                                   CONSTRAINT ck_order_refund_time CHECK (refund_time IS NULL OR (pay_time IS NOT NULL AND refund_time >= pay_time))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='摄影活动券与体验券订单表';
+
+
+
+-- ============================================================
+-- Based on upstream commit 36af3ca
+-- 将活动券公共信息与限时券库存、有效期拆分到两张表
+-- ============================================================
+
+-- 1. 删除引用旧字段的检查约束
+-- stock、begin_time、end_time 被删除前，必须先删除相关 CHECK
+ALTER TABLE `tb_voucher`
+    DROP CHECK `ck_voucher_values`,
+    DROP CHECK `ck_voucher_period`;
+
+-- 2. 调整活动券主表
+-- 新增券类型和状态，删除限时券专属字段
+ALTER TABLE `tb_voucher`
+    ADD COLUMN `type` TINYINT UNSIGNED NOT NULL DEFAULT 0
+        COMMENT '券类型：0普通券，1限时券'
+        AFTER `actual_value`,
+    ADD COLUMN `status` TINYINT UNSIGNED NOT NULL DEFAULT 1
+        COMMENT '券状态：1上架，2下架，3过期'
+        AFTER `type`,
+    DROP COLUMN `stock`,
+    DROP COLUMN `begin_time`,
+    DROP COLUMN `end_time`;
+
+-- 3. 重新建立活动券主表检查约束
+ALTER TABLE `tb_voucher`
+    ADD CONSTRAINT `ck_voucher_values`
+        CHECK (`pay_value` >= 0 AND `actual_value` > 0),
+    ADD CONSTRAINT `ck_voucher_type`
+        CHECK (`type` IN (0, 1)),
+    ADD CONSTRAINT `ck_voucher_status`
+        CHECK (`status` IN (1, 2, 3));
+
+-- 4. 新增限时券扩展表
+-- voucher_id 与 tb_voucher.id 逻辑关联，同时保证一张券最多一条限时信息
+CREATE TABLE `tb_seckill_voucher` (
+                                      `voucher_id` BIGINT UNSIGNED NOT NULL
+                                          COMMENT '活动券ID，逻辑关联tb_voucher.id，不独立自增',
+                                      `stock` INT UNSIGNED NOT NULL DEFAULT 0
+                                          COMMENT '剩余库存，由业务代码维护',
+                                      `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                          COMMENT '创建时间',
+                                      `begin_time` DATETIME NOT NULL
+                                          COMMENT '活动开始时间',
+                                      `end_time` DATETIME NOT NULL
+                                          COMMENT '活动结束时间',
+                                      `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                          ON UPDATE CURRENT_TIMESTAMP
+                                          COMMENT '最后更新时间',
+                                      PRIMARY KEY (`voucher_id`),
+                                      CONSTRAINT `ck_seckill_voucher_stock`
+                                          CHECK (`stock` >= 0),
+                                      CONSTRAINT `ck_seckill_voucher_period`
+                                          CHECK (`end_time` > `begin_time`)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci
+    COMMENT='限时活动券扩展表，与活动券主表一对一';

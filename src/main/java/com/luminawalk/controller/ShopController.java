@@ -33,10 +33,10 @@ public class ShopController {
     }
 
     @GetMapping("/of/type")
-    public  Result queryShopByType(@RequestParam("typeID") Integer typeID,
+    public  Result queryShopByType(@RequestParam("typeID") Long typeId,
                                    @RequestParam(value = "current", defaultValue = "1") Integer current){
         Page<Shop> page = shopService.query()
-                .eq("type_id", typeID)
+                .eq("type_id", typeId)
                 .page(new Page<>(current, SystemConstants.DEFAULT_PAGE_SIZE));
         return Result.ok(page.getRecords());
     }
@@ -48,5 +48,16 @@ public class ShopController {
                 .like(StrUtil.isNotBlank(name),"name", name)
                 .page(new Page<>(current, SystemConstants.DEFAULT_PAGE_SIZE));
         return Result.ok(page.getRecords());
+    }
+
+    /**
+     * 更新商铺信息
+     * @param shop 商铺数据
+     * @return 无
+     */
+    @PutMapping
+    public Result updateShop(@RequestBody Shop shop) {
+        shopService.updateById(shop);
+        return Result.ok();
     }
 }

@@ -1,5 +1,6 @@
 package com.luminawalk.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -55,24 +56,37 @@ public class Voucher implements Serializable {
     private Long actualValue;
 
     /**
-     * 库存
+     * 活动券类型：0普通券，1限时券
      */
-    private Integer stock;
+    private Integer type;
 
     /**
-     * 创建时间
+     * 活动券状态：1上架，2下架，3过期
      */
-    private LocalDateTime createTime;
+    private Integer status;
+
+    /**
+     * 库存
+     */
+    @TableField(exist = false)
+    private Integer stock;
 
     /**
      * 生效时间
      */
+    @TableField(exist = false)
     private LocalDateTime beginTime;
 
     /**
      * 失效时间
      */
+    @TableField(exist = false)
     private LocalDateTime endTime;
+
+    /**
+     * 创建时间
+     */
+    private LocalDateTime createTime;
 
     /**
      * 更新时间
