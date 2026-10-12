@@ -27,6 +27,32 @@ services:
       timeout: 3s
       retries: 20
       start_period: 30s
+  redis:
+    image: redis:7-alpine
+    container_name: luminawalk-redis
+
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?请在.env中设置REDIS_PASSWORD}
+
+    command:
+      - /bin/sh
+      - -c
+      - exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes
+
+    ports:
+      - "127.0.0.1:6379:6379"
+
+    volumes:
+      - redis_data:/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG'
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   mysql_data:
+  redis_data:

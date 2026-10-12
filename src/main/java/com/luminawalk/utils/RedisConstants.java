@@ -1,7 +1,28 @@
 package com.luminawalk.utils;
 
 public class RedisConstants {
-    public static final String VERIFY_CODE_KEY = "verify:phone:";
-    public static final String TOKEN_KEY = "TOKEN:";
+    /**
+     * 登录验证码的 Redis key 前缀，后面拼接手机号。
+     */
+    public static final String LOGIN_CODE_KEY = "login:code:";
+
+    /**
+     * 登录验证码有效期，单位：分钟。
+     */
+    public static final Long LOGIN_CODE_TTL = 2L;
+
+    /**
+     * 登录用户信息的 Redis key 前缀，后面拼接 token。
+     */
+    public static final String LOGIN_USER_KEY = "login:token:";
+
+    /**
+     * 登录状态有效期，单位：分钟。
+     */
+    public static final Long LOGIN_USER_TTL = 30L;
+
+    /**
+     * 地理位置数据的 Redis key 前缀，保留现有定义。
+     */
     public static final String SHOP_GEO_KEY = "SHOP:GEO:TYPE:";
 }
