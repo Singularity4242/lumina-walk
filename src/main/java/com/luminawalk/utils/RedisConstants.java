@@ -24,5 +24,19 @@ public class RedisConstants {
     /**
      * 地理位置数据的 Redis key 前缀，保留现有定义。
      */
-    public static final String SHOP_GEO_KEY = "SHOP:GEO:TYPE:";
+    // public static final String SHOP_GEO_KEY = "SHOP:GEO:TYPE:";
+    /**
+     * 空值缓存有效期，单位：分钟。
+     */
+    public static final Long CACHE_NULL_TTL = 2L;
+
+    /**
+     * 商店信息缓存有效期，单位：分钟。
+     */
+    public static final Long CACHE_SHOP_TTL = 30L;
+
+    /**
+     * 商店key
+     */
+    public static final String CACHE_SHOP_KEY = "cache:shop:";
 }
