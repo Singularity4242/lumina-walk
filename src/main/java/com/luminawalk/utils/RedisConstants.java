@@ -39,4 +39,8 @@ public class RedisConstants {
      * 商店key
      */
     public static final String CACHE_SHOP_KEY = "cache:shop:";
+
+    //当前是否有请求在重建该地点缓存
+    public static final String LOCK_SHOP_KEY = "lock:shop:";
+    public static final Long LOCK_SHOP_TTL = 10L;
 }
