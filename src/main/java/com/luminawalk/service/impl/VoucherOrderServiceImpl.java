@@ -11,6 +11,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.luminawalk.utils.RedisIdWorker;
 import com.luminawalk.utils.SimpleRedisLock;
 import com.luminawalk.utils.UserHolder;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +35,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     private RedisIdWorker redisIdWorker;
 
     @Resource
-    private StringRedisTemplate stringRedisTemplate;
+    private RedissonClient redissonClient;
 
     @Transactional
     public Result createVoucherOrder(Long voucherId) {
@@ -41,10 +43,11 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         Long userId = UserHolder.getUser().getId();
 
         // 创建锁对象
-        SimpleRedisLock redisLock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
+        RLock redisLock = redissonClient.getLock("lock:order:" + userId);
+        //SimpleRedisLock redisLock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
 
         // 尝试获取锁
-        boolean isLock = redisLock.tryLock(1200);
+        boolean isLock = redisLock.tryLock();
         if(!isLock) {
             //获取锁失败
             return Result.fail("不允许重复下单！");
