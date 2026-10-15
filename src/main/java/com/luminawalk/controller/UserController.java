@@ -1,6 +1,7 @@
 package com.luminawalk.controller;
 
 
+import cn.hutool.core.bean.BeanUtil;
 import com.luminawalk.dto.LoginFormDTO;
 import com.luminawalk.dto.Result;
 import com.luminawalk.dto.UserDTO;
@@ -10,7 +11,6 @@ import com.luminawalk.service.IUserInfoService;
 import com.luminawalk.service.IUserService;
 import com.luminawalk.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -77,5 +77,18 @@ public class UserController {
         info.setUpdateTime(null);
         // 返回
         return Result.ok(info);
+    }
+
+    // 指定用户的基本资料
+    @GetMapping("/{id}")
+    public Result queryUserById(@PathVariable("id") Long userId) {
+        // 用户详情
+        User user = userService.getById(userId);
+        if (user == null){
+            return Result.ok();
+        }
+        UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
+
+        return Result.ok(userDTO);
     }
 }
