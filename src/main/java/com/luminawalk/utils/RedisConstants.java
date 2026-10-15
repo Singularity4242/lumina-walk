@@ -43,4 +43,7 @@ public class RedisConstants {
     //当前是否有请求在重建该地点缓存
     public static final String LOCK_SHOP_KEY = "lock:shop:";
     public static final Long LOCK_SHOP_TTL = 10L;
+
+    // 秒杀库存
+    public static final String SECKILL_STOCK_KEY = "seckill:stock:";
 }
