@@ -46,4 +46,6 @@ public class RedisConstants {
 
     // 秒杀库存
     public static final String SECKILL_STOCK_KEY = "seckill:stock:";
+
+    public static final String BLOG_LIKED_KEY = "blog:liked:";
 }

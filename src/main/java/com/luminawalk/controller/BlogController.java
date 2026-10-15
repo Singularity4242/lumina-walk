@@ -5,9 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.luminawalk.dto.Result;
 import com.luminawalk.dto.UserDTO;
 import com.luminawalk.entity.Blog;
-import com.luminawalk.entity.User;
 import com.luminawalk.service.IBlogService;
-import com.luminawalk.service.IUserService;
 import com.luminawalk.utils.SystemConstants;
 import com.luminawalk.utils.UserHolder;
 import org.springframework.web.bind.annotation.*;
@@ -22,8 +20,7 @@ public class BlogController {
 
     @Resource
     private IBlogService blogService;
-    @Resource
-    private IUserService userService;
+
 
     // 发布blog保存
     @PostMapping
@@ -39,9 +36,8 @@ public class BlogController {
 
     // 点赞blog
     @PutMapping("/like/{id}")
-    public Result likeBlog(@PathVariable Long id) {
-        blogService.update().setSql("liked = liked + 1").eq("id",id).update();
-        return Result.ok();
+    public Result likeBlog(@PathVariable("id") Long id) {
+        return blogService.likeBlog(id);
     }
 
     // 查看本人blog
@@ -59,16 +55,17 @@ public class BlogController {
 
     //
     @GetMapping("/hot")
-    public Result queryHotBlot(@RequestParam (value = "current", defaultValue = "1") Integer current) {
-        Page<Blog> page = blogService.query().orderByDesc("liked")
-                .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
-        List<Blog> records = page.getRecords();
-        records.forEach(blog -> {
-            Long userId = blog.getUserId();
-            User user = userService.getById(userId);
-            blog.setIcon(user.getIcon());
-            blog.setName(user.getNickName());
-        });
-        return Result.ok(records);
+    public Result queryHotBlog(@RequestParam (value = "current", defaultValue = "1") Integer current) {
+        return blogService.queryHotBlog(current);
+    }
+
+    @GetMapping("/{id}")
+    public Result queryBlogById(@PathVariable("id") Long id) {
+        return blogService.queryBlogById(id);
+    }
+
+    @GetMapping("/likes/{id}")
+    public Result queryBlogLikes(@PathVariable("id") Long id) {
+        return blogService.queryBlogLikes(id);
     }
 }
