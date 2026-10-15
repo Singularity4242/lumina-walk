@@ -9,11 +9,9 @@ import com.luminawalk.service.ISeckillVoucherService;
 import com.luminawalk.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.luminawalk.utils.RedisIdWorker;
-import com.luminawalk.utils.SimpleRedisLock;
 import com.luminawalk.utils.UserHolder;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

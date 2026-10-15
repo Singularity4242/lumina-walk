@@ -27,7 +27,7 @@ class RedissonTest {
         lock = redissonClient.getLock("order");
 
         // 获取联锁
-        redissonClient.getMultiLock(lock, lock);
+        // redissonClient.getMultiLock(lock, lock);
     }
 
     @Test
