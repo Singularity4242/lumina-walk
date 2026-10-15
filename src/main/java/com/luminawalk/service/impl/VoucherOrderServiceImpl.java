@@ -9,7 +9,9 @@ import com.luminawalk.service.ISeckillVoucherService;
 import com.luminawalk.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.luminawalk.utils.RedisIdWorker;
+import com.luminawalk.utils.SimpleRedisLock;
 import com.luminawalk.utils.UserHolder;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,39 +32,24 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Resource
     private RedisIdWorker redisIdWorker;
 
-    @Override
-    public Result seckillVoucher(Long voucherId) {
-        // 1 查询秒杀券
-        SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
-        // 2 判断秒杀是否开始
-        if (voucher.getBeginTime().isAfter(LocalDateTime.now())) {
-            // 尚未开始
-            return Result.fail("秒杀尚未开始");
-        }
-
-        // 3 判断秒杀是否结束
-        if (voucher.getEndTime().isBefore(LocalDateTime.now())) {
-            // 已经结束
-            return Result.fail("秒杀已结束");
-        }
-
-        // 4 判断库存是否充足
-        if (voucher.getStock() < 1) {
-            return Result.fail("库存不足");
-        }
-
-        //
-        return createVoucherOrder(voucherId);
-    }
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     @Transactional
     public Result createVoucherOrder(Long voucherId) {
         // 5 一人一单
         Long userId = UserHolder.getUser().getId();
 
-        // 竞争同一个锁对象(userId.toString().intern()) 的线程，需要排队
-        // intern() 的作用是取得这个字符串在字符串池中的规范化对象引用。
-        synchronized (userId.toString().intern()) {
+        // 创建锁对象
+        SimpleRedisLock redisLock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
+
+        // 尝试获取锁
+        boolean isLock = redisLock.tryLock(1200);
+        if(!isLock) {
+            //获取锁失败
+            return Result.fail("不允许重复下单！");
+        }
+        try {
             // 5.1 查询订单
             int count = query().eq("user_id", userId).eq("voucher_id", voucherId).count();
 
@@ -91,6 +78,36 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             save(voucherOrder);
 
             return Result.ok(orderId);
+        } finally {
+            redisLock.unlock();
         }
+
+
     }
+
+    @Override
+    public Result seckillVoucher(Long voucherId) {
+        // 1 查询秒杀券
+        SeckillVoucher voucher = seckillVoucherService.getById(voucherId);
+        // 2 判断秒杀是否开始
+        if (voucher.getBeginTime().isAfter(LocalDateTime.now())) {
+            // 尚未开始
+            return Result.fail("秒杀尚未开始");
+        }
+
+        // 3 判断秒杀是否结束
+        if (voucher.getEndTime().isBefore(LocalDateTime.now())) {
+            // 已经结束
+            return Result.fail("秒杀已结束");
+        }
+
+        // 4 判断库存是否充足
+        if (voucher.getStock() < 1) {
+            return Result.fail("库存不足");
+        }
+
+        //
+        return createVoucherOrder(voucherId);
+    }
+
 }

@@ -17,9 +17,9 @@ public class RedisConstants {
     public static final String LOGIN_USER_KEY = "login:token:";
 
     /**
-     * 登录状态有效期，单位：分钟。
+     * 登录状态有效期
      */
-    public static final Long LOGIN_USER_TTL = 30L;
+    public static final Long LOGIN_USER_TTL = 36000L;
 
     /**
      * 地理位置数据的 Redis key 前缀，保留现有定义。
