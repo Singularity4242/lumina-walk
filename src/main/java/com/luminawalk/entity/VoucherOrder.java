@@ -13,7 +13,7 @@ import lombok.experimental.Accessors;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("tb_voucher_order")
+@TableName("tb_voucher_order") //券订单
 public class VoucherOrder implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -21,7 +21,7 @@ public class VoucherOrder implements Serializable {
     /**
      * 主键
      */
-    @TableId(value = "id", type = IdType.AUTO)
+    @TableId(value = "id", type = IdType.INPUT)
     private Long id;
 
     /**
