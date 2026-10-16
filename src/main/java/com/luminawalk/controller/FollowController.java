@@ -2,6 +2,7 @@ package com.luminawalk.controller;
 
 
 import com.luminawalk.dto.Result;
+import com.luminawalk.utils.SlidingWindowLimit;
 import com.luminawalk.service.IFollowService;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,6 +11,7 @@ import javax.annotation.Resource;
 
 @RestController
 @RequestMapping("/follow")
+@SlidingWindowLimit(globalLimit = true)
 public class FollowController {
 
     @Resource

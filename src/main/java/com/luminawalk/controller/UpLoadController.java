@@ -3,6 +3,7 @@ package com.luminawalk.controller;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import com.luminawalk.dto.Result;
+import com.luminawalk.utils.SlidingWindowLimit;
 import com.luminawalk.utils.SystemConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +16,7 @@ import java.util.UUID;
 @Slf4j
 @RestController
 @RequestMapping("upload")
+@SlidingWindowLimit(globalLimit = true)
 public class UpLoadController {
     @PostMapping("blog")
     public Result uploadImage(@RequestParam("file") MultipartFile image) {

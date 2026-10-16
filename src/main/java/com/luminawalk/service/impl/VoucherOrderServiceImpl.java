@@ -3,6 +3,7 @@ package com.luminawalk.service.impl;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.luminawalk.dto.Result;
+import com.luminawalk.config.QueueConfig;
 import com.luminawalk.entity.VoucherOrder;
 import com.luminawalk.mapper.VoucherOrderMapper;
 import com.luminawalk.service.IVoucherOrderService;
@@ -17,6 +18,9 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.Collections;
+import java.time.LocalDateTime;
+
+import static com.luminawalk.utils.RedisConstants.ORDER_PAYMENT_LOCK_PREFIX;
 
 @Slf4j
 @Service
@@ -61,19 +65,30 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         order.setId(orderId);
         order.setUserId(userId);
         order.setVoucherId(voucherId);
+        order.setStatus(VoucherOrder.STATUS_UNPAID);
+        LocalDateTime now = LocalDateTime.now();
+        order.setCreateTime(now);
+        order.setUpdateTime(now);
 
-        // 4. 发送 RabbitMQ 消息
+        // 4. 发送 RabbitMQ 消息保存订单
         String jsonStr = JSONUtil.toJsonStr(order);
         try {
             rabbitTemplate.convertAndSend("Common", "CQ", jsonStr);
         } catch (Exception e) {
             log.error("RabbitMQ 消息发送失败，订单ID: {}", orderId, e);
-
-            // 【进阶优化建议】
-            // 如果 MQ 发送失败，说明用户在 Redis 里扣了库存，但实际没下单。
-            // 严格来说，这里应该手动回滚 Redis 里的数据（把库存加回去，把 Set 里的 userId 删掉）。
-            // 但作为初学者项目，直接抛出异常，让前端提示“繁忙”即可。
             return Result.fail("系统繁忙，请稍后重试");
+        }
+
+        // 5. 发送超时检查消息；延迟队列中的消息 15 分钟后进入超时队列。
+        // 当前上游提交尚未提供超时队列消费者，发送消息本身不会关闭订单。
+        try {
+            rabbitTemplate.convertAndSend(
+                    QueueConfig.ORDER_DELAY_EXCHANGE,
+                    QueueConfig.ORDER_DELAY_ROUTING_KEY,
+                    String.valueOf(orderId));
+            log.info("订单超时检查消息已发送，订单ID={}", orderId);
+        } catch (Exception e) {
+            log.error("订单超时检查消息发送失败，订单ID: {}", orderId, e);
         }
 
         return Result.ok(orderId);

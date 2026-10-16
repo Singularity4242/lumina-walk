@@ -4,6 +4,7 @@ package com.luminawalk.controller;
 import cn.hutool.core.bean.BeanUtil;
 import com.luminawalk.dto.LoginFormDTO;
 import com.luminawalk.dto.Result;
+import com.luminawalk.utils.SlidingWindowLimit;
 import com.luminawalk.dto.UserDTO;
 import com.luminawalk.entity.User;
 import com.luminawalk.entity.UserInfo;
@@ -20,6 +21,7 @@ import javax.servlet.http.HttpSession;
 @Slf4j
 @RestController
 @RequestMapping("/user")
+@SlidingWindowLimit(globalLimit = true)
 public class UserController {
 
     @Resource

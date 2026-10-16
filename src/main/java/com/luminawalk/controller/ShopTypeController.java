@@ -2,6 +2,7 @@ package com.luminawalk.controller;
 
 
 import com.luminawalk.dto.Result;
+import com.luminawalk.utils.SlidingWindowLimit;
 import com.luminawalk.entity.ShopType;
 import com.luminawalk.service.IShopTypeService;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import java.util.List;
 @RestController
 @Slf4j
 @RequestMapping("/shop-type")
+@SlidingWindowLimit(globalLimit = true)
 public class ShopTypeController {
 
     @Resource

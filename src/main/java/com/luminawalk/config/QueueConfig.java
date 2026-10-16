@@ -22,6 +22,21 @@ public class QueueConfig {
     // 死信队列名称
     public static final String DEAD_LETTER_QUEUE_D = "DLQ";
 
+    // 订单延迟交换机名称
+    public static final String ORDER_DELAY_EXCHANGE = "order.delay.exchange";
+    // 订单延迟队列名称
+    public static final String ORDER_DELAY_QUEUE = "order.delay.queue";
+    // 订单延迟路由键
+    public static final String ORDER_DELAY_ROUTING_KEY = "order.delay";
+    // 订单超时死信交换机
+    public static final String ORDER_TIMEOUT_EXCHANGE = "order.timeout.exchange";
+    // 订单超时死信队列
+    public static final String ORDER_TIMEOUT_QUEUE = "order.timeout.queue";
+    // 订单超时死信路由键
+    public static final String ORDER_TIMEOUT_ROUTING_KEY = "order.timeout";
+
+    private static final long ORDER_PAYMENT_TIMEOUT = 15 * 60 * 1000;
+
     /**
      * 声明普通交换机
      *
@@ -109,5 +124,44 @@ public class QueueConfig {
     public Binding bindingDeadLetterQueueDToDeadLetterExchange(@Qualifier("deadLetterQueueD") Queue deadLetterQueueD,
                                                                @Qualifier("deadLetterExchange") DirectExchange deadLetterExchange) {
         return BindingBuilder.bind(deadLetterQueueD).to(deadLetterExchange).with("DLQ");
+    }
+
+    @Bean("orderDelayExchange")
+    public DirectExchange orderDelayExchange(){
+        return new DirectExchange(ORDER_DELAY_EXCHANGE);
+    }
+
+    @Bean("orderTimeoutExchange")
+    public DirectExchange orderTimeoutExchange(){
+        return new DirectExchange(ORDER_TIMEOUT_EXCHANGE);
+    }
+
+    @Bean("orderDelayQueue")
+    public Queue orderDelayQueue(){
+        HashMap<String, Object> arguments = new HashMap<>();
+        arguments.put("x-message-ttl", ORDER_PAYMENT_TIMEOUT);
+        arguments.put("x-dead-letter-exchange", ORDER_TIMEOUT_EXCHANGE);
+        arguments.put("x-dead-letter-routing-key", ORDER_TIMEOUT_ROUTING_KEY);
+        return QueueBuilder.durable(ORDER_DELAY_QUEUE)
+                .withArguments(arguments)
+                .build();
+    }
+
+    @Bean("orderTimeoutQueue")
+    public Queue orderTimeoutQueue(){
+        return QueueBuilder.durable(ORDER_TIMEOUT_QUEUE)
+                .build();
+    }
+
+    @Bean
+    public Binding bindingOrderDelayQueueToOrderDelayExchange(@Qualifier("orderDelayQueue") Queue orderDelayQueue,
+                                                               @Qualifier("orderDelayExchange") DirectExchange orderDelayExchange) {
+        return BindingBuilder.bind(orderDelayQueue).to(orderDelayExchange).with(ORDER_DELAY_ROUTING_KEY);
+    }
+
+    @Bean
+    public Binding bindingOrderTimeoutQueueToOrderTimeoutExchange(@Qualifier("orderTimeoutQueue") Queue orderTimeoutQueue,
+                                                                  @Qualifier("orderTimeoutExchange") DirectExchange orderTimeoutExchange) {
+        return BindingBuilder.bind(orderTimeoutQueue).to(orderTimeoutExchange).with(ORDER_TIMEOUT_ROUTING_KEY);
     }
 }

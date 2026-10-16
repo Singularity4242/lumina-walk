@@ -18,6 +18,17 @@ public class VoucherOrder implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    public static final Integer PAY_TYPE_BALANCE = 1;
+    public static final Integer PAY_TYPE_ALIPAY = 2;
+    public static final Integer PAY_TYPE_WECHAT = 3;
+
+    public static final Integer STATUS_UNPAID = 1;
+    public static final Integer STATUS_PAID = 2;
+    public static final Integer STATUS_USED = 3;
+    public static final Integer STATUS_CANCELLED = 4;
+    public static final Integer STATUS_REFUNDING = 5;
+    public static final Integer STATUS_REFUNDED = 6;
+
     /**
      * 主键
      */

@@ -2,6 +2,7 @@ package com.luminawalk.controller;
 
 
 import com.luminawalk.dto.Result;
+import com.luminawalk.utils.SlidingWindowLimit;
 import com.luminawalk.entity.Voucher;
 import com.luminawalk.service.IVoucherService;
 import org.springframework.web.bind.annotation.*;
@@ -11,6 +12,7 @@ import javax.annotation.Resource;
 
 @RestController
 @RequestMapping("/voucher")
+@SlidingWindowLimit(globalLimit = true)
 public class VoucherController {
     @Resource
     private IVoucherService voucherService;

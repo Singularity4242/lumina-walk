@@ -3,6 +3,7 @@ package com.luminawalk.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.luminawalk.dto.Result;
+import com.luminawalk.utils.SlidingWindowLimit;
 import com.luminawalk.entity.Shop;
 import com.luminawalk.service.IShopService;
 import com.luminawalk.utils.SystemConstants;
@@ -15,6 +16,7 @@ import javax.annotation.Resource;
 @Slf4j
 @RestController
 @RequestMapping("/shop")
+@SlidingWindowLimit(globalLimit = true)
 public class ShopController {
 
     @Resource

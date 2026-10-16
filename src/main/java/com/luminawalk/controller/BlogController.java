@@ -3,6 +3,7 @@ package com.luminawalk.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.luminawalk.dto.Result;
+import com.luminawalk.utils.SlidingWindowLimit;
 import com.luminawalk.dto.UserDTO;
 import com.luminawalk.entity.Blog;
 import com.luminawalk.service.IBlogService;
@@ -16,6 +17,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/blog")
+@SlidingWindowLimit(globalLimit = true)
 public class BlogController {
 
     @Resource

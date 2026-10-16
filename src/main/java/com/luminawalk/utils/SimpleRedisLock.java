@@ -31,12 +31,30 @@ public class SimpleRedisLock implements ILock{
 
     @Override
     public boolean tryLock(long timeoutSec) {
-        //获得线程标识
+        return tryLock(0, timeoutSec, TimeUnit.SECONDS);
+    }
+
+    public boolean tryLock(long waitTime, long leaseTime, TimeUnit unit) {
         String threadId = ID_PREFIX + Thread.currentThread().getId();
-        // 获取锁
-        Boolean success = stringRedisTemplate.opsForValue()
-                .setIfAbsent(KEY_PREFIX + name, threadId, timeoutSec, TimeUnit.SECONDS);
-        return Boolean.TRUE.equals(success);
+        long waitNanos = unit.toNanos(waitTime);
+        long startTime = System.nanoTime();
+        while (true) {
+            Boolean success = stringRedisTemplate.opsForValue()
+                    .setIfAbsent(KEY_PREFIX + name, threadId, leaseTime, unit);
+            if (Boolean.TRUE.equals(success)) {
+                return true;
+            }
+            if (System.nanoTime() - startTime >= waitNanos) {
+                return false;
+            }
+            try {
+                TimeUnit.NANOSECONDS.sleep(Math.min(TimeUnit.MILLISECONDS.toNanos(10),
+                        Math.max(1, waitNanos - (System.nanoTime() - startTime))));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
     }
 
     @Override

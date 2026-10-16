@@ -54,4 +54,7 @@ public class RedisConstants {
     public static final String SHOP_GEO_KEY = "shop:geo:";
 
     public static final String USER_SIGN_KEY = "sign:";
+
+    public static final String ORDER_PAYMENT_LOCK_PREFIX = "lock:order:payment:";
+    public static final String ORDER_TIMEOUT_LOCK_PREFIX = "lock:order:timeout:";
 }

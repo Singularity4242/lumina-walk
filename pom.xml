@@ -34,6 +34,13 @@
             <artifactId>spring-boot-starter-amqp</artifactId>
         </dependency>
 
+        <!-- AspectJ核心依赖（@Aspect注解的来源） -->
+        <dependency>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjweaver</artifactId>
+            <version>1.9.20</version>
+        </dependency>
+
         <!-- 关键：手动添加适配 Spring Boot 2.x 的适配器 -->
         <dependency>
             <groupId>org.redisson</groupId>
