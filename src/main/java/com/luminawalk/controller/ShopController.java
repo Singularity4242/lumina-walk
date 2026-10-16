@@ -6,12 +6,13 @@ import com.luminawalk.dto.Result;
 import com.luminawalk.entity.Shop;
 import com.luminawalk.service.IShopService;
 import com.luminawalk.utils.SystemConstants;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import cn.hutool.core.util.StrUtil;
 
 import javax.annotation.Resource;
 
-
+@Slf4j
 @RestController
 @RequestMapping("/shop")
 public class ShopController {
@@ -37,13 +38,14 @@ public class ShopController {
                                    @RequestParam(value = "current", defaultValue = "1") Integer current,
                                    @RequestParam(value = "x", required = false) Double x,
                                    @RequestParam(value = "y", required = false) Double y){
-
+        log.info("根据商铺类型分页查询商铺信息，type:{},x:{},y:{},当前页数：{},",typeId,x,y,current);
         return shopService.queryShopByType(typeId, current, x, y);
     }
 
     @GetMapping("/of/name")
     public  Result queryShopByName(@RequestParam(value = "name", required = false) String name,
                                    @RequestParam(value = "current", defaultValue = "1") Integer current){
+        log.info("根据商铺类型分页查询商铺信息，name:{}",name);
         Page<Shop> page = shopService.query()
                 .like(StrUtil.isNotBlank(name),"name", name)
                 .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
