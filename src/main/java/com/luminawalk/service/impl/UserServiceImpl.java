@@ -2,6 +2,7 @@ package com.luminawalk.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
 import com.luminawalk.dto.LoginFormDTO;
 import com.luminawalk.dto.Result;
@@ -27,7 +28,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -116,7 +116,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 1. 校验手机号
         String phone = loginForm.getPhone();
         if(RegexUtils.isPhoneInvalid(phone)){
-            return Result.fail("手机号格式错误");
+            return Result.fail("手机号格式错误！");
         }
         // 2. 校验验证码是否一致从redis获取验证码并校验
         // Object cacheCode = session.getAttribute("code");
@@ -125,7 +125,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
         String code = loginForm.getCode();
         if( cacheCode == null || !cacheCode.equals(code)) {
-            return Result.fail("验证码错误!");
+            return Result.fail("验证码错误");
         }
         // 3. 根据手机号查是否已有用户, 不为空则已有用户
         User user = query().eq("phone",phone).one();
@@ -138,7 +138,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
         // 7.保存信息到redis
         // 7.1 随机生成token作为登陆令牌
-        String token = UUID.randomUUID().toString();
+        String token = UUID.randomUUID().toString(true);
         // 7.2 将User对象转为Hashmap存储
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
         Map<String, Object> userMap = BeanUtil.beanToMap(userDTO, new HashMap<>(),

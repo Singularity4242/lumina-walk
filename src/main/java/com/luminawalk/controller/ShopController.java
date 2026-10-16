@@ -29,7 +29,7 @@ public class ShopController {
 
     @GetMapping("/{id}")
     public Result queryShopById(@PathVariable("id") Long id) {
-        return shopService.queryByID(id);
+        return shopService.queryById(id);
     }
 
     @GetMapping("/of/type")
@@ -46,7 +46,7 @@ public class ShopController {
                                    @RequestParam(value = "current", defaultValue = "1") Integer current){
         Page<Shop> page = shopService.query()
                 .like(StrUtil.isNotBlank(name),"name", name)
-                .page(new Page<>(current, SystemConstants.DEFAULT_PAGE_SIZE));
+                .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
         return Result.ok(page.getRecords());
     }
 

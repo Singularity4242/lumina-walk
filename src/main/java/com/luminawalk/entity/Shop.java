@@ -65,7 +65,7 @@ public class Shop implements Serializable {
     /**
      * 均价，取整数
      */
-    private Integer avgPrice;
+    private Long avgPrice;
 
     /**
      * 销量

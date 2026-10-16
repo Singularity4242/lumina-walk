@@ -50,7 +50,24 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: luminawalk-rabbitmq
+    hostname: luminawalk-rabbitmq
+    restart: unless-stopped
+
+    environment:
+      RABBITMQ_DEFAULT_USER: luminawalk
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
 
 volumes:
   mysql_data:
   redis_data:
+  rabbitmq_data:

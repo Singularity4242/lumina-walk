@@ -7,9 +7,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 public interface IShopService extends IService<Shop> {
 
-    Result queryByID(Long id);
+    Result queryById(Long id);
 
     Result update(Shop shop);
 
     Result queryShopByType(Integer typeId, Integer current, Double x, Double y);
+
+    @Transactional
+    Result saveShop(Shop shop);
 }

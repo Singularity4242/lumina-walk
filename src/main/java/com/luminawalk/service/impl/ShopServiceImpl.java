@@ -10,6 +10,8 @@ import com.luminawalk.service.IShopService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.luminawalk.utils.CacheClient;
 import com.luminawalk.utils.SystemConstants;
+import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RBloomFilter;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
@@ -20,7 +22,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -32,16 +33,24 @@ import static com.luminawalk.utils.RedisConstants.*;
  * </p>
  */
 @Service
+@Slf4j
 public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
 
     @Resource
-    public StringRedisTemplate stringRedisTemplate;
+    private StringRedisTemplate stringRedisTemplate;
 
     @Resource
     private CacheClient cacheClient;
 
+    @Resource
+    private RBloomFilter<Long> shopBloomFilter;
+
     @Override
-    public Result queryByID(Long id) {
+    public Result queryById(Long id) {
+        if (!shopBloomFilter.contains(id)) {
+            log.info("布隆过滤器拦截，店铺ID {} 不存在", id);
+            return Result.fail("店铺不存在");
+        }
         // 解决缓存穿透
         Shop shop = cacheClient.queryWithPassThrough(CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
 
@@ -54,17 +63,18 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         //         .queryWithLogicalExpire(CACHE_SHOP_KEY, id, Shop.class, this::getById, 20L, TimeUnit.SECONDS);
 
         if(shop == null) {
-            return Result.fail("店铺信息不存在");
+            return Result.fail("店铺不存在！");
         }
         return Result.ok(shop);
     }
+
 
     @Transactional
     @Override
     public Result update(Shop shop) {
         Long id = shop.getId();
         if(id == null) {
-            return Result.fail("id不能为空");
+            return Result.fail("店铺id不能为空");
         }
         // 先数据库更新
         updateById(shop);
@@ -127,5 +137,18 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
 
         return  Result.ok(shops);
+    }
+
+    @Transactional
+    @Override
+    public Result saveShop(Shop shop) {
+        // 保存到数据库
+        save(shop);
+
+        // 添加到布隆过滤器
+        shopBloomFilter.add(shop.getId());
+        log.info("新店铺 {} 已添加到布隆过滤器", shop.getId());
+
+        return Result.ok(shop.getId());
     }
 }

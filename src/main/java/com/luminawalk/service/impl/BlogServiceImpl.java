@@ -155,7 +155,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         // 2.保存探店笔记
         boolean isSuccess = save(blog);
         if (!isSuccess) {
-            return Result.fail("新增笔记失败");
+            return Result.fail("新增笔记失败!");
         }
         // 3.查询笔记作者的所有粉丝 select * from tb_follow where follow_user_id = ?
         List<Follow> follows = followService.query()

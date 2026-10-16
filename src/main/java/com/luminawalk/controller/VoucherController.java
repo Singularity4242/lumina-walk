@@ -31,14 +31,14 @@ public class VoucherController {
      * @param voucher 优惠券信息，包含秒杀信息
      * @return 优惠券id
      */
-    @PostMapping("seckill")
+    @PostMapping("/seckill")
     public Result addSeckillVoucher(@RequestBody Voucher voucher){
         voucherService.addSeckillVoucher(voucher);
         return Result.ok(voucher.getId());
     }
 
     @GetMapping("/list/{shopId}")
-    public Result getVouchersofShop(@PathVariable("shopId") Long shopId){
+    public Result queryVoucherOfShop(@PathVariable("shopId") Long shopId){
         return voucherService.queryVoucherOfShop(shopId);
     }
 }
