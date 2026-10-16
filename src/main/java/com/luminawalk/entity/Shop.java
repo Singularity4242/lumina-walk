@@ -55,12 +55,12 @@ public class Shop implements Serializable {
     /**
      * 经度
      */
-    private BigDecimal x;
+    private Double x;
 
     /**
      * 维度
      */
-    private BigDecimal y;
+    private Double y;
 
     /**
      * 均价，取整数
