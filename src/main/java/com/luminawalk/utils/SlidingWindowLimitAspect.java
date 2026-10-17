@@ -35,12 +35,19 @@ public class SlidingWindowLimitAspect {
     private static final String RATE_LIMIT_PREFIX = "rate_limit:";
     private static final ExpressionParser PARSER = new SpelExpressionParser();
     private static final DefaultParameterNameDiscoverer PARAMETER_NAMES = new DefaultParameterNameDiscoverer();
+    // 保留上游 889dca5 的参数兜底和非正阈值放行规则，修正请求乱序时的漏计。
     private static final String LIMIT_SCRIPT =
-            "redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[2])\n"
-                    + "local count = redis.call('ZCOUNT', KEYS[1], ARGV[2], ARGV[1])\n"
-                    + "if count >= tonumber(ARGV[4]) then return 1 end\n"
-                    + "redis.call('ZADD', KEYS[1], ARGV[1], ARGV[3])\n"
-                    + "redis.call('PEXPIRE', KEYS[1], ARGV[5])\n"
+            "local currentTime = tonumber(ARGV[1]) or 0.0\n"
+                    + "local windowStartTime = tonumber(ARGV[2]) or 0.0\n"
+                    + "local requestId = ARGV[3] or ''\n"
+                    + "local maxRequests = tonumber(ARGV[4]) or 0.0\n"
+                    + "local expireSeconds = tonumber(ARGV[5]) or 60.0\n"
+                    + "redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', windowStartTime)\n"
+                    // 较晚取时间戳的请求可能先写入 Redis，不能用本次时间戳作为统计上限。
+                    + "local count = tonumber(redis.call('ZCOUNT', KEYS[1], windowStartTime, '+inf')) or 0.0\n"
+                    + "if maxRequests > 0 and count >= maxRequests then return 1 end\n"
+                    + "redis.call('ZADD', KEYS[1], currentTime, requestId)\n"
+                    + "redis.call('EXPIRE', KEYS[1], math.max(expireSeconds, 60))\n"
                     + "return 0";
 
     @Resource
@@ -74,9 +81,10 @@ public class SlidingWindowLimitAspect {
     private void checkLimit(SlidingWindowLimit limit, Method method,
                             ProceedingJoinPoint joinPoint, ServletRequestAttributes attributes) {
         long windowMillis = limit.timeUnit().toMillis(limit.windowSize());
-        if (windowMillis <= 0 || limit.maxRequests() <= 0) {
-            throw new IllegalArgumentException("限流窗口和请求数必须为正，窗口至少为 1 毫秒");
+        if (windowMillis <= 0) {
+            throw new IllegalArgumentException("限流窗口至少为 1 毫秒");
         }
+        // 不再拦截非正阈值，由 Lua 按上游规则放行，仍记录请求并设置 TTL。
         String key;
         if (limit.globalLimit()) {
             // 同一策略的全局额度由所有被标注的接口、用户共同使用，不按 IP 拆分。
@@ -102,16 +110,18 @@ public class SlidingWindowLimitAspect {
 
     private boolean isRateLimited(String key, long windowMillis, int maxRequests) {
         long now = System.currentTimeMillis();
+        // 窗口的两倍换算成秒，向上取整，至少保留 60 秒。
+        long expireSeconds = Math.max((long) Math.ceil(windowMillis * 2.0 / 1000), 60);
         try {
             // Lua 参数需要明文数字，不能使用 Redisson 默认的对象序列化编码。
             Long result = redissonClient.getScript(StringCodec.INSTANCE).eval(
                     RScript.Mode.READ_WRITE, LIMIT_SCRIPT, RScript.ReturnType.INTEGER,
-                    Collections.singletonList(key), now, now - windowMillis,
-                    UUID.randomUUID().toString(), maxRequests, windowMillis * 2);
+                    Collections.singletonList(key), (double) now, (double) (now - windowMillis),
+                    UUID.randomUUID().toString(), (double) maxRequests, (double) expireSeconds);
             return Long.valueOf(1).equals(result);
         } catch (Exception e) {
             // 保留上游的故障策略：Redis 限流检查失败时放行。
-            log.error("限流服务异常，降级放行", e);
+            log.error("限流服务异常，降级放行，key:{}", key, e);
             return false;
         }
     }

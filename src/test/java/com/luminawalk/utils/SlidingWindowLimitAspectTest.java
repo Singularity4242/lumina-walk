@@ -85,6 +85,14 @@ class SlidingWindowLimitAspectTest {
     }
 
     @Test
+    void zeroThresholdReachesLuaInsteadOfThrowingValidationError() {
+        // 确认真实注解经过 checkLimit 时不再因阈值为 0 报错，也没有提前跳过 Lua。
+        // Lua 对 0 的实际处理由真实 Redis 集成测试验证。
+        assertTrue(controller.unlimited().getSuccess());
+        assertEquals(2, calls.get(), "类级检查和方法级检查都应执行");
+    }
+
+    @Test
     void userLimitSeparatesUsersAndVouchers() {
         controller.buy(9L);
         controller.buy(10L);
@@ -141,6 +149,11 @@ class SlidingWindowLimitAspectTest {
 
         @SlidingWindowLimit(keySpEL = "#voucherId", timeUnit = TimeUnit.MINUTES, maxRequests = 1)
         public Result buy(Long voucherId) {
+            return Result.ok();
+        }
+
+        @SlidingWindowLimit(globalLimit = true, maxRequests = 0)
+        public Result unlimited() {
             return Result.ok();
         }
     }
