@@ -7,7 +7,7 @@ import com.luminawalk.entity.Voucher;
 import com.luminawalk.service.IVoucherService;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 
 
 @RestController

@@ -21,8 +21,8 @@ import org.springframework.stereotype.Service;
 import static com.luminawalk.utils.SystemConstants.USER_NICK_NAME_PREFIX;
 import static com.luminawalk.utils.RedisConstants.*;
 
-import javax.annotation.Resource;
-import javax.servlet.http.HttpSession;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpSession;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;

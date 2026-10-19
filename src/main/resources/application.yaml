@@ -8,6 +8,13 @@ spring:
     url: jdbc:mysql://127.0.0.1:3306/luminawalk?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: luminawalk
     password: password
+  ai:
+    openai:
+      api-key: sk-a6aa17e721e342d69bfc78ab022f7127
+      base-url: https://dashscope.aliyuncs.com/compatible-mode
+      chat:
+        options:
+          model: qwen-max-latest
   redis:
     host: 127.0.0.1
     port: 6379
@@ -25,34 +32,40 @@ spring:
     username: "luminawalk"
     password: "password"
     virtual-host: /
+    # 确认消息投递（做高并发/秒杀项目时通常需要开启）
     publisher-confirm-type: correlated
     publisher-returns: true
   jackson:
     default-property-inclusion: non_null # JSON处理时忽略非空字段
-#  open-ai:
-#    chat-model:
-#      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
-#      api-key: sk-a6aa17e721e342d69bfc78ab022f7127
-#      model-name: qwen-plus
-#      log-requests: true
-#      log-responses: true
-#    streaming-chat-model:
-#      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
-#      api-key: sk-a6aa17e721e342d69bfc78ab022f7127
-#      model-name: qwen-plus
-#      log-requests: true
-#      log-responses: true
-#    embedding-model:
-#      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
-#      api-key: sk-a6aa17e721e342d69bfc78ab022f7127
-#      model-name: text-embedding-v3
-#      log-requests: true
-#      log-responses: true
-#      max-segments-per-batch: 10
 mybatis-plus:
   type-aliases-package: com.luminawalk.entity # 别名扫描包
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  open-ai:
+    chat-model:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: sk-a6aa17e721e342d69bfc78ab022f7127
+      model-name: qwen-plus
+      log-requests: true
+      log-responses: true
+    streaming-chat-model:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: sk-a6aa17e721e342d69bfc78ab022f7127
+      model-name: qwen-plus
+      log-requests: true
+      log-responses: true
+    embedding-model:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: sk-a6aa17e721e342d69bfc78ab022f7127
+      model-name: text-embedding-v3
+      log-requests: true
+      log-responses: true
+      max-segments-per-batch: 10
+  community:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: ${REDIS_PASSWORD}
 logging:
   level:
     com.luminawalk: debug

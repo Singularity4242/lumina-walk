@@ -6,7 +6,7 @@ import com.luminawalk.utils.SlidingWindowLimit;
 import com.luminawalk.service.IFollowService;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 
 
 @RestController

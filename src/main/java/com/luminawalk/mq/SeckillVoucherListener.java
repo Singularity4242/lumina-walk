@@ -11,7 +11,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 import com.rabbitmq.client.Channel; // Channel 是这个包的
 import org.springframework.amqp.core.Message; // Message 是这个包的
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 
 
 @Component

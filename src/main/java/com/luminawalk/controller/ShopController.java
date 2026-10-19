@@ -10,8 +10,7 @@ import com.luminawalk.utils.SystemConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import cn.hutool.core.util.StrUtil;
-
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 
 @Slf4j
 @RestController

@@ -6,7 +6,7 @@ import com.luminawalk.entity.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpSession;
 
 public interface IUserService extends IService<User> {
 
