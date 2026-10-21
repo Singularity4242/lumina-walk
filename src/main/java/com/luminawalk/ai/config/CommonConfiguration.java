@@ -11,8 +11,6 @@ import io.milvus.param.collection.DescribeCollectionParam;
 import io.milvus.param.collection.DropCollectionParam;
 import io.milvus.param.collection.HasCollectionParam;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.BatchingStrategy;
 import org.springframework.ai.embedding.EmbeddingModel;
@@ -37,11 +35,6 @@ import java.time.Duration;
 @Configuration
 @EnableConfigurationProperties(AiAgentProperties.class)
 public class CommonConfiguration {
-
-        @Bean
-        public ChatClient aiChatClient(ChatModel chatModel) {
-            return ChatClient.builder(chatModel).build();
-        }
 
         @Bean
         public RestClientCustomizer aiRestClientCustomizer(AiAgentProperties properties) {

@@ -17,7 +17,7 @@ public class AiAgentProperties {
 
     private Insight insight = new Insight();
 
-    private Planner planner = new Planner();
+    private MultiAgent multiAgent = new MultiAgent();
 
     @Data
     public static class Memory {
@@ -28,6 +28,7 @@ public class AiAgentProperties {
     public static class Rag {
         private int topK = 5;
         private double similarityThreshold = 0.65;
+        private double knowledgeSimilarityThreshold = 0.35;
         private Collections collections = new Collections();
     }
 
@@ -49,8 +50,8 @@ public class AiAgentProperties {
     }
 
     @Data
-    public static class Planner {
-        private boolean llmEnabled = false;
+    public static class MultiAgent {
+        private int maxSteps = 20;
     }
 
     @Data

@@ -3,18 +3,17 @@ package com.luminawalk.ai.agent.scene;
 public enum AiAgentScene {
 
     CHAT,
-    SHOP_RECOMMEND,
-    SHOP_INSIGHT;
+    MULTI_AGENT;
 
     public static AiAgentScene from(String value) {
         if (value == null || value.isBlank()) {
-            return CHAT;
+            return MULTI_AGENT;
         }
         for (AiAgentScene scene : values()) {
             if (scene.name().equalsIgnoreCase(value)) {
                 return scene;
             }
         }
-        return CHAT;
+        return MULTI_AGENT;
     }
 }

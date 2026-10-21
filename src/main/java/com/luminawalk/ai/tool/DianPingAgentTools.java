@@ -2,6 +2,7 @@ package com.luminawalk.ai.tool;
 
 import com.luminawalk.ai.config.AiAgentProperties;
 import com.luminawalk.ai.dto.BlogVectorHitDTO;
+import com.luminawalk.ai.dto.KnowledgeHitDTO;
 import com.luminawalk.ai.dto.ShopReviewSummaryDTO;
 import com.luminawalk.ai.dto.ShopToolDTO;
 import com.luminawalk.ai.rag.retriever.AiRagRetriever;
@@ -69,6 +70,11 @@ public class DianPingAgentTools {
                 .toList();
     }
 
+    @Tool(description = "搜索平台知识库，返回语义相关的业务知识片段")
+    public List<KnowledgeHitDTO> searchKnowledgeBase(@ToolParam(description = "用户查询") String query) {
+        return aiRagRetriever.searchKnowledge(query);
+    }
+
     @Tool(description = "获取店铺探店笔记原始文本，优先返回点赞高的样本")
     public List<String> getShopReviewTexts(@ToolParam(description = "店铺ID") Long shopId) {
         List<Blog> blogs = blogService.lambdaQuery()
@@ -114,6 +120,15 @@ public class DianPingAgentTools {
             @ToolParam(description = "召回条数") Integer topK) {
         return aiRagRetriever.searchBlogReviews(query, topK);
     }
+
+    @Tool(description = "按店铺搜索探店笔记向量，返回语义相关的评论样本")
+    public List<BlogVectorHitDTO> vectorSearchBlogsByShop(
+            @ToolParam(description = "店铺ID") Long shopId,
+            @ToolParam(description = "用户查询") String query,
+            @ToolParam(description = "召回条数") Integer topK) {
+        return aiRagRetriever.searchBlogReviewsByShop(shopId, query, topK);
+    }
+
 
     private ShopToolDTO toShopToolDTO(Shop shop) {
         if (shop == null) {

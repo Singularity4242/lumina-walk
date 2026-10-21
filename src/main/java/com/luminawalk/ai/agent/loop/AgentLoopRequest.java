@@ -1,7 +1,10 @@
 package com.luminawalk.ai.agent.loop;
 
-import com.luminawalk.ai.agent.scene.AiAgentScene;
 import lombok.Data;
+import org.springframework.ai.chat.messages.Message;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 public class AgentLoopRequest {
@@ -16,5 +19,5 @@ public class AgentLoopRequest {
 
     private Integer topK;
 
-    private AiAgentScene sceneOverride;
+    private List<Message> historyMessages = new ArrayList<>();
 }

@@ -6,18 +6,30 @@ import com.luminawalk.ai.dto.KnowledgeHitDTO;
 import com.luminawalk.ai.dto.ShopToolDTO;
 import com.luminawalk.ai.rag.AiMetadataConstants;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AiRagRetriever {
@@ -38,10 +50,27 @@ public class AiRagRetriever {
     }
 
     public List<KnowledgeHitDTO> searchKnowledge(String query, Filter.Expression filterExpression) {
-        return knowledgeVectorStore.similaritySearch(buildSearchRequest(query, aiAgentProperties.getRag().getTopK(), filterExpression))
+        Set<String> keywords = extractKeywords(query);
+        List<KnowledgeHitDTO> vectorHits = knowledgeVectorStore.similaritySearch(
+                        buildSearchRequest(query, aiAgentProperties.getRag().getTopK(), aiAgentProperties.getRag().getKnowledgeSimilarityThreshold(), filterExpression))
                 .stream()
                 .map(this::toKnowledgeHit)
                 .toList();
+        List<KnowledgeHitDTO> fallbackHits = keywordFallbackKnowledgeSearch(query, keywords);
+        if (!fallbackHits.isEmpty()) {
+            List<KnowledgeHitDTO> relevantVectorHits = vectorHits.stream()
+                    .filter(hit -> keywordScore(hit.getContent(), keywords) > 0)
+                    .toList();
+            List<KnowledgeHitDTO> mergedHits = mergeKnowledgeHits(relevantVectorHits, fallbackHits, keywords);
+            log.info("Knowledge fallback merged for query='{}', vectorSize={}, fallbackSize={}, mergedSize={}",
+                    query, vectorHits.size(), fallbackHits.size(), mergedHits.size());
+            return mergedHits;
+        }
+        if (!vectorHits.isEmpty()) {
+            log.debug("Knowledge vector hits found for query='{}', size={}", query, vectorHits.size());
+            return vectorHits;
+        }
+        return List.of();
     }
 
     public List<ShopToolDTO> searchShopProfiles(String query, Integer topK) {
@@ -63,14 +92,14 @@ public class AiRagRetriever {
     public List<BlogVectorHitDTO> searchBlogReviewsByShop(Long shopId, String query, Integer topK) {
         Filter.Expression filterExpression = new FilterExpressionBuilder().eq(AiMetadataConstants.SHOP_ID, shopId).build();
         int finalTopK = topK == null || topK <= 0 ? aiAgentProperties.getRag().getTopK() : topK;
-        return blogReviewVectorStore.similaritySearch(buildSearchRequest(query, finalTopK, filterExpression))
+        return blogReviewVectorStore.similaritySearch(buildSearchRequest(query, finalTopK, null, filterExpression))
                 .stream()
                 .map(this::toBlogHit)
                 .toList();
     }
 
     public boolean hasKnowledgeDocuments() {
-        return !knowledgeVectorStore.similaritySearch(buildSearchRequest("黑马点评", 1, null)).isEmpty();
+        return !knowledgeVectorStore.similaritySearch(buildSearchRequest("黑马点评", 1, aiAgentProperties.getRag().getKnowledgeSimilarityThreshold(), null)).isEmpty();
     }
 
     public boolean hasShopProfileDocuments() {
@@ -82,15 +111,162 @@ public class AiRagRetriever {
     }
 
     private SearchRequest buildSearchRequest(String query, int topK, Filter.Expression filterExpression) {
+        return buildSearchRequest(query, topK, aiAgentProperties.getRag().getSimilarityThreshold(), filterExpression);
+    }
+
+    private SearchRequest buildSearchRequest(String query, int topK, Double similarityThreshold, Filter.Expression filterExpression) {
         SearchRequest.Builder builder = SearchRequest.builder()
                 .query(StringUtils.hasText(query) ? query : "黑马点评")
-                .topK(topK)
-                .similarityThreshold(aiAgentProperties.getRag().getSimilarityThreshold());
+                .topK(topK);
+        if (similarityThreshold != null) {
+            builder.similarityThreshold(similarityThreshold);
+        }
         if (filterExpression != null) {
             builder.filterExpression(filterExpression);
         }
         return builder.build();
     }
+
+    private List<KnowledgeHitDTO> keywordFallbackKnowledgeSearch(String query, Set<String> keywords) {
+        if (!StringUtils.hasText(query) || keywords.isEmpty()) {
+            return List.of();
+        }
+
+        List<KnowledgeHitDTO> results = new ArrayList<>();
+        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+        try {
+            Resource[] resources = resolver.getResources("classpath:knowledge/*.txt");
+            for (Resource resource : resources) {
+                String text = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                String[] passages = text.split("(\\r?\\n){2,}");
+                for (int i = 0; i < passages.length; i++) {
+                    String passage = passages[i].trim();
+                    if (!StringUtils.hasText(passage)) {
+                        continue;
+                    }
+                    int score = keywordScore(passage, keywords);
+                    if (score <= 0) {
+                        continue;
+                    }
+                    KnowledgeHitDTO dto = new KnowledgeHitDTO();
+                    dto.setId(resource.getFilename() + "#fallback-" + i);
+                    dto.setSourceId(resource.getFilename() + "#fallback-" + i);
+                    dto.setContent(passage);
+                    dto.setScore((double) score);
+                    results.add(dto);
+                }
+            }
+        }
+        catch (Exception e) {
+            log.warn("Knowledge keyword fallback search failed for query='{}': {}", query, e.getMessage());
+            return List.of();
+        }
+
+        return results.stream()
+                .sorted(Comparator.comparing(KnowledgeHitDTO::getScore, Comparator.nullsLast(Double::compareTo)).reversed())
+                .limit(aiAgentProperties.getRag().getTopK())
+                .toList();
+    }
+
+    private List<KnowledgeHitDTO> mergeKnowledgeHits(List<KnowledgeHitDTO> vectorHits,
+                                                     List<KnowledgeHitDTO> fallbackHits,
+                                                     Set<String> keywords) {
+        List<KnowledgeHitDTO> merged = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (KnowledgeHitDTO hit : fallbackHits) {
+            if (seen.add(dedupKey(hit))) {
+                merged.add(hit);
+            }
+        }
+        for (KnowledgeHitDTO hit : vectorHits) {
+            if (seen.add(dedupKey(hit))) {
+                merged.add(hit);
+            }
+        }
+        return merged.stream()
+                .sorted(Comparator
+                        .<KnowledgeHitDTO>comparingInt(hit -> keywordScore(hit.getContent(), keywords))
+                        .reversed()
+                        .thenComparing(KnowledgeHitDTO::getScore, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(aiAgentProperties.getRag().getTopK())
+                .toList();
+    }
+
+    private String dedupKey(KnowledgeHitDTO hit) {
+        String content = hit == null || hit.getContent() == null ? "" : hit.getContent().replaceAll("\\s+", " ").trim();
+        String sourceId = hit == null ? "" : String.valueOf(hit.getSourceId());
+        return sourceId + "|" + content;
+    }
+
+    private List<KnowledgeHitDTO> keywordFallbackKnowledgeSearch(String query) {
+        if (!StringUtils.hasText(query)) {
+            return List.of();
+        }
+        Set<String> keywords = extractKeywords(query);
+        if (keywords.isEmpty()) {
+            return List.of();
+        }
+        return keywordFallbackKnowledgeSearch(query, keywords);
+    }
+
+    private Set<String> extractKeywords(String query) {
+        String normalized = query.replaceAll("[^\\p{IsHan}A-Za-z0-9]", "");
+        if (!StringUtils.hasText(normalized)) {
+            return Set.of();
+        }
+        List<String> stopWords = Arrays.asList("请问", "一下", "什么", "哪些", "有啥", "有什么", "怎么", "可以", "告诉我", "我想", "呢", "吗");
+        for (String stopWord : stopWords) {
+            normalized = normalized.replace(stopWord, "");
+        }
+        if (!StringUtils.hasText(normalized)) {
+            normalized = query.replaceAll("\\s+", "");
+        }
+
+        Set<String> keywords = new LinkedHashSet<>();
+        if (normalized.length() <= 4) {
+            keywords.add(normalized);
+        }
+        for (int i = 0; i < normalized.length() - 1; i++) {
+            keywords.add(normalized.substring(i, i + 2));
+        }
+        keywords.addAll(extractDomainKeywords(query));
+        return keywords.stream()
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Set<String> extractDomainKeywords(String query) {
+        Set<String> keywords = new LinkedHashSet<>();
+        if (query.contains("会员") || query.contains("SVIP")) {
+            keywords.add("会员");
+            keywords.add("SVIP");
+        }
+        if (query.contains("福利")) {
+            keywords.add("福利");
+        }
+        if (query.contains("积分")) {
+            keywords.add("积分");
+        }
+        if (query.contains("秒杀")) {
+            keywords.add("秒杀");
+        }
+        if (query.contains("退款")) {
+            keywords.add("退款");
+        }
+        if (query.contains("优惠券")) {
+            keywords.add("优惠券");
+        }
+        return keywords;
+    }
+
+    private int keywordScore(String passage, Set<String> keywords) {
+        return keywords.stream()
+                .filter(Objects::nonNull)
+                .filter(keyword -> keyword.length() >= 2)
+                .mapToInt(keyword -> passage.contains(keyword) ? 1 : 0)
+                .sum();
+    }
+
 
     private KnowledgeHitDTO toKnowledgeHit(Document document) {
         KnowledgeHitDTO dto = new KnowledgeHitDTO();

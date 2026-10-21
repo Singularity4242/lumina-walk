@@ -69,17 +69,18 @@ ai:
       read-timeout-seconds: ${AI_AGENT_MODEL_READ_TIMEOUT_SECONDS:90}
       write-timeout-seconds: ${AI_AGENT_MODEL_WRITE_TIMEOUT_SECONDS:90}
       call-timeout-seconds: ${AI_AGENT_MODEL_CALL_TIMEOUT_SECONDS:120}
-    planner:
-      llm-enabled: ${AI_AGENT_PLANNER_LLM_ENABLED:false}
     insight:
       max-review-samples: ${AI_AGENT_INSIGHT_MAX_REVIEW_SAMPLES:8}
       max-review-chars-per-sample: ${AI_AGENT_INSIGHT_MAX_REVIEW_CHARS_PER_SAMPLE:280}
       max-combined-chars: ${AI_AGENT_INSIGHT_MAX_COMBINED_CHARS:2200}
       max-vector-hits: ${AI_AGENT_INSIGHT_MAX_VECTOR_HITS:4}
       max-vector-hit-chars: ${AI_AGENT_INSIGHT_MAX_VECTOR_HIT_CHARS:180}
+    multi-agent:
+      max-steps: ${AI_AGENT_MULTI_AGENT_MAX_STEPS:20}
     rag:
       top-k: ${AI_AGENT_RAG_TOP_K:5}
       similarity-threshold: ${AI_AGENT_RAG_SIMILARITY_THRESHOLD:0.65}
+      knowledge-similarity-threshold: ${AI_AGENT_RAG_KNOWLEDGE_SIMILARITY_THRESHOLD:0.35}
       collections:
         knowledge: knowledge_vector
         shop-profile: shop_profile_vector

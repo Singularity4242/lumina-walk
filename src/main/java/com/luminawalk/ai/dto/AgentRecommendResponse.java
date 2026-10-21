@@ -8,7 +8,7 @@ import java.util.List;
 @Data
 public class AgentRecommendResponse {
 
-    private String scene = "SHOP_RECOMMEND";
+    private String scene = "MULTI_AGENT";
 
     private String query;
 
