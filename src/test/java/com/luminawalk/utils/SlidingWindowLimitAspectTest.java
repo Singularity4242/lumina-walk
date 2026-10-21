@@ -114,7 +114,7 @@ class SlidingWindowLimitAspectTest {
     void nonWebCallSkipsRedis() {
         RequestContextHolder.resetRequestAttributes();
         assertTrue(controller.read().getSuccess());
-        verify(redisson, never()).getScript(any());
+        verify(redisson, never()).getScript(any(org.redisson.client.codec.Codec.class));
     }
 
     @Test

@@ -1,90 +1,250 @@
 package com.luminawalk.ai.config;
 
-import com.luminawalk.ai.constants.SystemConstants;
-import com.luminawalk.ai.model.AlibabaOpenAiChatModel;
-import io.micrometer.observation.ObservationRegistry;
-import org.springframework.ai.autoconfigure.openai.OpenAiChatProperties;
-import org.springframework.ai.autoconfigure.openai.OpenAiConnectionProperties;
+import io.milvus.client.MilvusServiceClient;
+import io.milvus.grpc.FieldSchema;
+import io.milvus.grpc.KeyValuePair;
+import io.milvus.grpc.ListDatabasesResponse;
+import io.milvus.param.ConnectParam;
+import io.milvus.param.R;
+import io.milvus.param.collection.CreateDatabaseParam;
+import io.milvus.param.collection.DescribeCollectionParam;
+import io.milvus.param.collection.DropCollectionParam;
+import io.milvus.param.collection.HasCollectionParam;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
-import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.InMemoryChatMemory;
-import org.springframework.ai.chat.observation.ChatModelObservationConvention;
-import org.springframework.ai.chat.prompt.ChatOptions;
-import org.springframework.ai.model.SimpleApiKey;
-import org.springframework.ai.model.tool.ToolCallingManager;
-import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.OpenAiEmbeddingModel;
-import org.springframework.ai.openai.api.OpenAiApi;
-import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.embedding.BatchingStrategy;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.ai.vectorstore.milvus.MilvusVectorStore;
+import org.springframework.ai.vectorstore.milvus.autoconfigure.MilvusServiceClientProperties;
+import org.springframework.ai.vectorstore.milvus.autoconfigure.MilvusVectorStoreProperties;
+import org.springframework.boot.web.client.RestClientCustomizer;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.retry.support.RetryTemplate;
-import org.springframework.util.CollectionUtils;
+import org.springframework.http.client.OkHttp3ClientHttpRequestFactory;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.ResponseErrorHandler;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.reactive.function.client.WebClient;
-import java.util.HashMap;
+import okhttp3.OkHttpClient;
+import java.util.ArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.time.Duration;
 
+
+@Slf4j
 @Configuration
+@EnableConfigurationProperties(AiAgentProperties.class)
 public class CommonConfiguration {
 
         @Bean
-        public ChatMemory chatMemory() {
-            return new InMemoryChatMemory();
+        public ChatClient aiChatClient(ChatModel chatModel) {
+            return ChatClient.builder(chatModel).build();
         }
 
         @Bean
-        public VectorStore vectorStore(OpenAiEmbeddingModel embeddingModel) {
-            return SimpleVectorStore.builder(embeddingModel).build();
+        public RestClientCustomizer aiRestClientCustomizer(AiAgentProperties properties) {
+            return builder -> {
+                OkHttpClient okHttpClient = new OkHttpClient.Builder()
+                        .connectTimeout(Duration.ofSeconds(properties.getModel().getConnectTimeoutSeconds()))
+                        .readTimeout(Duration.ofSeconds(properties.getModel().getReadTimeoutSeconds()))
+                        .writeTimeout(Duration.ofSeconds(properties.getModel().getWriteTimeoutSeconds()))
+                        .callTimeout(Duration.ofSeconds(properties.getModel().getCallTimeoutSeconds()))
+                        .retryOnConnectionFailure(true)
+                        .build();
+
+                OkHttp3ClientHttpRequestFactory requestFactory = new OkHttp3ClientHttpRequestFactory(okHttpClient);
+                requestFactory.setConnectTimeout(Duration.ofSeconds(properties.getModel().getConnectTimeoutSeconds()));
+                requestFactory.setReadTimeout(Duration.ofSeconds(properties.getModel().getReadTimeoutSeconds()));
+                requestFactory.setWriteTimeout(Duration.ofSeconds(properties.getModel().getWriteTimeoutSeconds()));
+                builder.requestFactory(requestFactory);
+            };
         }
 
         @Bean
-        public ChatClient assistantChatClient(AlibabaOpenAiChatModel model, ChatMemory chatMemory, MyAssistantTools myAssistantTools) {
-            return ChatClient
-                    .builder(model)
-                    .CommonConfiguration(SystemConstants.SERVICE_SYSTEM_PROMPT)
-                    .CommonConfiguration(
-                            new SimpleLoggerAdvisor(),
-                            new CommonConfiguration(chatMemory)
-                    )
-                    .CommonConfiguration(courseTools)
-                    .CommonConfiguration();
+        public MilvusServiceClient milvusServiceClient(MilvusServiceClientProperties clientProperties,
+                                                       MilvusVectorStoreProperties vectorStoreProperties) {
+            String databaseName = StringUtils.hasText(vectorStoreProperties.getDatabaseName())
+                    ? vectorStoreProperties.getDatabaseName()
+                    : MilvusVectorStore.DEFAULT_DATABASE_NAME;
 
-        }
-
-
-        @Bean
-        public AlibabaOpenAiChatModel alibabaOpenAiChatModel(OpenAiConnectionProperties commonProperties, OpenAiChatProperties chatProperties, ObjectProvider<RestClient.Builder> restClientBuilderProvider, ObjectProvider<WebClient.Builder> webClientBuilderProvider, ToolCallingManager toolCallingManager, RetryTemplate retryTemplate, ResponseErrorHandler responseErrorHandler, ObjectProvider<ObservationRegistry> observationRegistry, ObjectProvider<ChatModelObservationConvention> observationConvention) {
-            String baseUrl = StringUtils.hasText(chatProperties.getBaseUrl()) ? chatProperties.getBaseUrl() : commonProperties.getBaseUrl();
-            String apiKey = StringUtils.hasText(chatProperties.getApiKey()) ? chatProperties.getApiKey() : commonProperties.getApiKey();
-            String projectId = StringUtils.hasText(chatProperties.getProjectId()) ? chatProperties.getProjectId() : commonProperties.getProjectId();
-            String organizationId = StringUtils.hasText(chatProperties.getOrganizationId()) ? chatProperties.getOrganizationId() : commonProperties.getOrganizationId();
-            Map<String, List<String>> connectionHeaders = new HashMap<>();
-            if (StringUtils.hasText(projectId)) {
-                connectionHeaders.put("OpenAI-Project", List.of(projectId));
+            if (!MilvusVectorStore.DEFAULT_DATABASE_NAME.equals(databaseName)) {
+                MilvusServiceClient adminClient = new MilvusServiceClient(baseConnectParamBuilder(clientProperties).build());
+                ensureDatabaseExists(adminClient, databaseName);
+                closeQuietly(adminClient);
             }
 
-            if (StringUtils.hasText(organizationId)) {
-                connectionHeaders.put("OpenAI-Organization", List.of(organizationId));
-            }
-            RestClient.Builder restClientBuilder = restClientBuilderProvider.getIfAvailable(RestClient::builder);
-            WebClient.Builder webClientBuilder = webClientBuilderProvider.getIfAvailable(WebClient::builder);
-            OpenAiApi openAiApi = OpenAiApi.builder().baseUrl(baseUrl).apiKey(new SimpleApiKey(apiKey)).headers(CollectionUtils.toMultiValueMap(connectionHeaders)).completionsPath(chatProperties.getCompletionsPath()).embeddingsPath("/v1/embeddings").restClientBuilder(restClientBuilder).webClientBuilder(webClientBuilder).responseErrorHandler(responseErrorHandler).build();
-            AlibabaOpenAiChatModel chatModel = AlibabaOpenAiChatModel.builder().openAiApi(openAiApi).defaultOptions(chatProperties.getOptions()).toolCallingManager(toolCallingManager).retryTemplate(retryTemplate).observationRegistry(observationRegistry.getIfUnique(() -> ObservationRegistry.NOOP)).build();
-            Objects.requireNonNull(chatModel);
-            observationConvention.ifAvailable(chatModel::setObservationConvention);
-            return chatModel;
+            return new MilvusServiceClient(baseConnectParamBuilder(clientProperties)
+                    .withDatabaseName(databaseName)
+                    .build());
         }
+
+    @Bean("knowledgeVectorStore")
+    public VectorStore knowledgeVectorStore(MilvusServiceClient milvusServiceClient,
+                                            EmbeddingModel embeddingModel,
+                                            MilvusVectorStoreProperties properties,
+                                            AiAgentProperties aiAgentProperties) {
+        return buildVectorStore(milvusServiceClient, embeddingModel, properties, aiAgentProperties.getRag().getCollections().getKnowledge());
+    }
+
+    @Bean("shopProfileVectorStore")
+    public VectorStore shopProfileVectorStore(MilvusServiceClient milvusServiceClient,
+                                              EmbeddingModel embeddingModel,
+                                              MilvusVectorStoreProperties properties,
+                                              AiAgentProperties aiAgentProperties) {
+        return buildVectorStore(milvusServiceClient, embeddingModel, properties, aiAgentProperties.getRag().getCollections().getShopProfile());
+    }
+
+    @Bean("blogReviewVectorStore")
+    public VectorStore blogReviewVectorStore(MilvusServiceClient milvusServiceClient,
+                                             EmbeddingModel embeddingModel,
+                                             MilvusVectorStoreProperties properties,
+                                             AiAgentProperties aiAgentProperties) {
+        return buildVectorStore(milvusServiceClient, embeddingModel, properties, aiAgentProperties.getRag().getCollections().getBlogReview());
+    }
+
+    private VectorStore buildVectorStore(MilvusServiceClient milvusServiceClient,
+                                         EmbeddingModel embeddingModel,
+                                         MilvusVectorStoreProperties properties,
+                                         String collectionName) {
+        String databaseName = properties.getDatabaseName();
+        int embeddingDimension = properties.getEmbeddingDimension() > 0 ? properties.getEmbeddingDimension() : 1024;
+        resetCollectionIfDimensionMismatch(milvusServiceClient, databaseName, collectionName, embeddingDimension, properties.isInitializeSchema());
+        return MilvusVectorStore.builder(milvusServiceClient, embeddingModel)
+                .databaseName(databaseName)
+                .collectionName(collectionName)
+                .embeddingDimension(embeddingDimension)
+                .initializeSchema(properties.isInitializeSchema())
+                .batchingStrategy(fixedSizeBatchingStrategy(10))
+                .build();
+    }
+
+    private BatchingStrategy fixedSizeBatchingStrategy(int batchSize) {
+        return documents -> {
+            List<List<Document>> batches = new ArrayList<>();
+            for (int i = 0; i < documents.size(); i += batchSize) {
+                batches.add(documents.subList(i, Math.min(i + batchSize, documents.size())));
+            }
+            return batches;
+        };
+    }
+
+    private void resetCollectionIfDimensionMismatch(MilvusServiceClient client,
+                                                    String databaseName,
+                                                    String collectionName,
+                                                    int expectedDimension,
+                                                    boolean initializeSchema) {
+        try {
+            Boolean hasCollection = client.hasCollection(HasCollectionParam.newBuilder()
+                    .withDatabaseName(databaseName)
+                    .withCollectionName(collectionName)
+                    .build()).getData();
+            if (!Boolean.TRUE.equals(hasCollection)) {
+                return;
+            }
+
+            R<io.milvus.grpc.DescribeCollectionResponse> response = client.describeCollection(DescribeCollectionParam.newBuilder()
+                    .withDatabaseName(databaseName)
+                    .withCollectionName(collectionName)
+                    .build());
+            if (response.getData() == null || response.getData().getSchema() == null) {
+                return;
+            }
+
+            Integer actualDimension = response.getData().getSchema().getFieldsList().stream()
+                    .filter(field -> MilvusVectorStore.EMBEDDING_FIELD_NAME.equals(field.getName()))
+                    .findFirst()
+                    .map(this::extractVectorDimension)
+                    .orElse(null);
+
+            if (actualDimension == null || actualDimension == expectedDimension) {
+                return;
+            }
+
+            if (!initializeSchema) {
+                throw new IllegalStateException("Milvus collection " + collectionName + " 的向量维度为 "
+                        + actualDimension + "，但当前配置需要 " + expectedDimension
+                        + "。请开启 initialize-schema 或手工删除旧 collection。");
+            }
+
+            log.warn("Milvus collection {} dimension mismatch: actual={}, expected={}. Dropping and recreating it.",
+                    collectionName, actualDimension, expectedDimension);
+            client.dropCollection(DropCollectionParam.newBuilder()
+                    .withDatabaseName(databaseName)
+                    .withCollectionName(collectionName)
+                    .build());
+        }
+        catch (Exception e) {
+            throw new IllegalStateException("检查 Milvus collection 维度失败: " + collectionName, e);
+        }
+    }
+
+    private Integer extractVectorDimension(FieldSchema fieldSchema) {
+        for (KeyValuePair typeParam : fieldSchema.getTypeParamsList()) {
+            if ("dim".equals(typeParam.getKey())) {
+                return Integer.valueOf(typeParam.getValue());
+            }
+        }
+        return null;
+    }
+
+    private ConnectParam.Builder baseConnectParamBuilder(MilvusServiceClientProperties properties) {
+        ConnectParam.Builder builder = ConnectParam.newBuilder();
+        if (StringUtils.hasText(properties.getUri())) {
+            builder.withUri(properties.getUri());
+        }
+        else {
+            builder.withHost(properties.getHost()).withPort(properties.getPort());
+        }
+        if (StringUtils.hasText(properties.getToken())) {
+            builder.withToken(properties.getToken());
+        }
+        if (StringUtils.hasText(properties.getUsername()) && StringUtils.hasText(properties.getPassword())) {
+            builder.withAuthorization(properties.getUsername(), properties.getPassword());
+        }
+        if (properties.getConnectTimeoutMs() > 0) {
+            builder.withConnectTimeout(properties.getConnectTimeoutMs(), TimeUnit.MILLISECONDS);
+        }
+        if (properties.getKeepAliveTimeMs() > 0) {
+            builder.withKeepAliveTime(properties.getKeepAliveTimeMs(), TimeUnit.MILLISECONDS);
+        }
+        if (properties.getKeepAliveTimeoutMs() > 0) {
+            builder.withKeepAliveTimeout(properties.getKeepAliveTimeoutMs(), TimeUnit.MILLISECONDS);
+        }
+        if (properties.getRpcDeadlineMs() > 0) {
+            builder.withRpcDeadline(properties.getRpcDeadlineMs(), TimeUnit.MILLISECONDS);
+        }
+        if (properties.getIdleTimeoutMs() > 0) {
+            builder.withIdleTimeout(properties.getIdleTimeoutMs(), TimeUnit.MILLISECONDS);
+        }
+        builder.withSecure(properties.isSecure());
+        return builder;
+    }
+
+    private void ensureDatabaseExists(MilvusServiceClient client, String databaseName) {
+        try {
+            R<ListDatabasesResponse> response = client.listDatabases();
+            if (response.getData() != null && response.getData().getDbNamesList().contains(databaseName)) {
+                return;
+            }
+            client.createDatabase(CreateDatabaseParam.newBuilder().withDatabaseName(databaseName).build());
+            log.info("Created Milvus database: {}", databaseName);
+        }
+        catch (Exception e) {
+            log.warn("Failed to create Milvus database {}, assuming it already exists: {}", databaseName, e.getMessage());
+        }
+    }
+
+    private void closeQuietly(MilvusServiceClient client) {
+        try {
+            client.close(0L);
+        }
+        catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
 }
 
 
