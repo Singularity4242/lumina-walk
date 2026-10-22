@@ -1,12 +1,19 @@
 package com.luminawalk.ai.service;
 
 import com.luminawalk.ai.dto.*;
+import com.luminawalk.dto.CreateChatMessageRequest;
+import com.luminawalk.dto.CreateChatMessageResponse;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
 public interface AiAgentService {
 
-    ChatStreamSession chat(AgentChatRequest request);
+    ConversationSummaryDTO createConversation();
+
+    CreateChatMessageResponse createChatMessage(CreateChatMessageRequest request);
+
+    SseEmitter streamConversation(Long conversationId);
 
     List<ConversationSummaryDTO> listConversations();
 

@@ -47,6 +47,10 @@ public class RedisConstants {
     // 秒杀库存
     public static final String SECKILL_STOCK_KEY = "seckill:stock:";
 
+    public static final String SECKILL_ORDER_PENDING_KEY = "seckill:order:pending:";
+
+    public static final Long SECKILL_ORDER_PENDING_TTL_MINUTES = 5L;
+
     public static final String BLOG_LIKED_KEY = "blog:liked:";
 
     public static final String FEED_KEY = "feed:";

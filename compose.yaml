@@ -47,19 +47,45 @@ services:
       timeout: 3s
       retries: 10
 
-  rabbitmq:
-    image: rabbitmq:4-management
-    container_name: luminawalk-rabbitmq
-    hostname: luminawalk-rabbitmq
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.3.2
+    platform: linux/amd64
+    container_name: luminawalk-rocketmq-namesrv
     restart: unless-stopped
     environment:
-      RABBITMQ_DEFAULT_USER: luminawalk
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      JAVA_OPT_EXT: "-Xms128m -Xmx256m -Xmn64m"
     ports:
-      - "127.0.0.1:5672:5672"
-      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:9876:9876"
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - rocketmq_namesrv_logs:/home/rocketmq/logs
+    command: [ "sh", "mqnamesrv" ]
+    healthcheck:
+      test: [ "CMD", "bash", "-c", ": > /dev/tcp/127.0.0.1/9876" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.2
+    platform: linux/amd64
+    container_name: luminawalk-rocketmq-broker
+    restart: unless-stopped
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_healthy
+    environment:
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+      JAVA_OPT_EXT: "-Xms512m -Xmx1g -Xmn256m -XX:MaxDirectMemorySize=256m"
+    ports:
+      - "127.0.0.1:10911:10911"
+      - "127.0.0.1:10909:10909"
+    volumes:
+      - ./docker/rocketmq/broker.conf:/home/rocketmq/broker.conf:ro
+      - rocketmq_broker_logs:/home/rocketmq/logs
+      - rocketmq_broker_store:/home/rocketmq/store
+    command: [ "sh", "mqbroker", "-c", "/home/rocketmq/broker.conf" ]
+
   etcd:
     container_name: milvus-etcd
     image: quay.io/coreos/etcd:v3.5.18
@@ -123,7 +149,9 @@ services:
 volumes:
   mysql_data:
   redis_data:
-  rabbitmq_data:
+  rocketmq_namesrv_logs:
+  rocketmq_broker_logs:
+  rocketmq_broker_store:
   milvus_etcd_data:
   milvus_minio_data:
   milvus_data:

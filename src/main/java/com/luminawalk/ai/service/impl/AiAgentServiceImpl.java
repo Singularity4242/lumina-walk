@@ -7,7 +7,6 @@ import com.luminawalk.ai.agent.loop.AgentLoopExecution;
 import com.luminawalk.ai.agent.loop.AgentLoopStatus;
 import com.luminawalk.ai.agent.scene.AiAgentScene;
 import com.luminawalk.ai.config.AiAgentProperties;
-import com.luminawalk.ai.dto.AgentChatRequest;
 import com.luminawalk.ai.dto.AgentRecommendRequest;
 import com.luminawalk.ai.dto.AgentRecommendResponse;
 import com.luminawalk.ai.dto.ConversationSummaryDTO;
@@ -17,16 +16,19 @@ import com.luminawalk.ai.dto.ShopInsightResponse;
 import com.luminawalk.ai.memory.ConversationMemoryService;
 import com.luminawalk.ai.rag.indexer.AiVectorIndexService;
 import com.luminawalk.ai.service.AiAgentService;
-import com.luminawalk.ai.service.ChatStreamSession;
+import com.luminawalk.dto.CreateChatMessageRequest;
+import com.luminawalk.dto.CreateChatMessageResponse;
 import com.luminawalk.dto.UserDTO;
+import com.luminawalk.event.ChatMessageCreatedEvent;
+import com.luminawalk.service.ChatSseService;
 import com.luminawalk.utils.UserHolder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.messages.Message;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import reactor.core.publisher.Flux;
-
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.List;
 
 @Slf4j
@@ -42,30 +44,58 @@ public class AiAgentServiceImpl implements AiAgentService {
 
     private final AiAgentProperties aiAgentProperties;
 
+    private final ApplicationEventPublisher applicationEventPublisher;
+
+    private final ChatSseService chatSseService;
+
     @Override
-    public ChatStreamSession chat(AgentChatRequest request) {
-        Long userId = currentUserId();
-        if (!StringUtils.hasText(request.getPrompt())) {
-            throw new IllegalArgumentException("prompt 不能为空");
-        }
-
-        var conversation = conversationMemoryService.getOrCreateConversation(userId, request.getConversationId(), request.getPrompt(), AiAgentScene.MULTI_AGENT.name());
-        List<Message> historyMessages = conversationMemoryService.loadRecentMessages(conversation.getId(), aiAgentProperties.getMemory().getWindowSize());
-        conversationMemoryService.appendUserMessage(conversation.getId(), request.getPrompt());
-
-        AgentLoopRequest loopRequest = new AgentLoopRequest();
-        loopRequest.setPrompt(request.getPrompt());
-        loopRequest.setX(request.getX());
-        loopRequest.setY(request.getY());
-        loopRequest.setHistoryMessages(historyMessages);
-        AgentLoopResult loopResult = agentLoopExecutor.execute(loopRequest);
-        loopResult.getToolLogs().forEach(log -> conversationMemoryService.appendToolMessage(conversation.getId(), log.getToolName(), log.getPayload()));
-        conversationMemoryService.updateConversation(conversation.getId(), loopResult.getScene(), request.getPrompt());
-
-        Flux<String> stream = Flux.just(buildAgentLoopReply(loopResult.getAgentLoopExecution()))
-                .transform(flux -> persistAssistantReply(conversation.getId(), request.getPrompt(), loopResult.getScene(), flux));
-        return new ChatStreamSession(conversation.getId(), stream);
+    @Transactional
+    public ConversationSummaryDTO createConversation() {
+        var conversation = conversationMemoryService.getOrCreateConversation(
+                currentUserId(),
+                null,
+                null,
+                AiAgentScene.MULTI_AGENT.name()
+        );
+        return ConversationSummaryDTO.from(conversation);
     }
+
+
+    @Override
+    @Transactional
+    public CreateChatMessageResponse createChatMessage(CreateChatMessageRequest request) {
+        Long userId = currentUserId();
+        if (request == null || !StringUtils.hasText(request.getContent())) {
+            throw new IllegalArgumentException("content 不能为空");
+        }
+            var conversation = conversationMemoryService.getOrCreateConversation(
+                    userId,
+                    request.getConversationId(),
+                    request.getContent(),
+                    AiAgentScene.MULTI_AGENT.name()
+            );
+            var chatMessage = conversationMemoryService.appendUserMessage(conversation.getId(), request.getContent());
+            applicationEventPublisher.publishEvent(new ChatMessageCreatedEvent(
+                    userId,
+                    conversation.getId(),
+                    chatMessage.getId(),
+                    chatMessage.getContent(),
+                    request.getX(),
+                    request.getY()
+            ));
+            return CreateChatMessageResponse.builder()
+                    .conversationId(conversation.getId())
+                    .chatMessageId(chatMessage.getId())
+                    .build();
+    }
+
+    @Override
+    public SseEmitter streamConversation(Long conversationId) {
+        Long userId = currentUserId();
+        conversationMemoryService.ensureConversationOwnership(userId, conversationId);
+        return chatSseService.connect(userId, conversationId);
+    }
+
 
     @Override
     public List<ConversationSummaryDTO> listConversations() {
@@ -120,15 +150,6 @@ public class AiAgentServiceImpl implements AiAgentService {
         return aiVectorIndexService.rebuildShop(shopId);
     }
 
-
-    private Flux<String> persistAssistantReply(Long conversationId, String prompt, String scene, Flux<String> flux) {
-        StringBuilder buffer = new StringBuilder();
-        return flux.doOnNext(buffer::append)
-                .doOnComplete(() -> {
-                    conversationMemoryService.appendAssistantMessage(conversationId, buffer.toString());
-                    conversationMemoryService.updateConversation(conversationId, scene, prompt);
-                });
-    }
 
     private Long currentUserId() {
         UserDTO user = UserHolder.getUser();

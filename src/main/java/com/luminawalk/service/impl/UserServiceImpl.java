@@ -103,11 +103,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
         // 生成验证码
         String code = RandomUtil.randomNumbers(6);
+        String redisKey = LOGIN_CODE_KEY + phone;
+        stringRedisTemplate.opsForValue().set(redisKey, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
+
         // 保存验证码
-        stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
+        String cachedCode = stringRedisTemplate.opsForValue().get(redisKey);
+        if (!code.equals(cachedCode)) {
+            log.error("验证码写入Redis失败，phone={}, key={}", maskPhone(phone), redisKey);
+            return Result.fail("验证码发送失败，请稍后重试");
+        }
 
         // TODO:发送验证码
-        log.debug("发送短信验证码成功，验证码：{}", code);
+        Long expireSeconds = stringRedisTemplate.getExpire(redisKey, TimeUnit.SECONDS);
+        log.info("验证码发送成功，phone={}, key={}, ttlSeconds={}, code={}", maskPhone(phone), redisKey, expireSeconds, code);
         return Result.ok();
     }
 
@@ -164,5 +172,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 2.保存
         save(user);
         return user;
+    }
+
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() < 7) {
+            return phone;
+        }
+        return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4);
     }
 }

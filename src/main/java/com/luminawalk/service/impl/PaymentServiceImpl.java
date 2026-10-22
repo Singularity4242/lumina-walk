@@ -2,23 +2,24 @@ package com.luminawalk.service.impl;
 
 
 import com.luminawalk.dto.Result;
+import com.luminawalk.dto.UserDTO;
 import com.luminawalk.entity.VoucherOrder;
 import com.luminawalk.service.IPaymentService;
-import com.luminawalk.service.ISeckillVoucherService;
 import com.luminawalk.service.IVoucherOrderService;
-import com.luminawalk.utils.RedisIdWorker;
 import com.luminawalk.utils.SimpleRedisLock;
+import com.luminawalk.utils.UserHolder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
 
 import static com.luminawalk.utils.RedisConstants.ORDER_PAYMENT_LOCK_PREFIX;
+import static com.luminawalk.utils.RedisConstants.SECKILL_ORDER_PENDING_KEY;
 
 @Slf4j
 @Service
@@ -26,10 +27,8 @@ import static com.luminawalk.utils.RedisConstants.ORDER_PAYMENT_LOCK_PREFIX;
 public class PaymentServiceImpl implements IPaymentService {
 
     private final IVoucherOrderService voucherOrderService;
-    private final ISeckillVoucherService seckillVoucherService;
     private final StringRedisTemplate stringRedisTemplate;
-    private final RabbitTemplate rabbitTemplate;
-    private final RedisIdWorker redisIdWorker;
+
 
     @Override
     public Result createPayment(Long orderId, Integer payType) {
@@ -111,9 +110,18 @@ public class PaymentServiceImpl implements IPaymentService {
     @Override
     public Result checkPaymentStatus(Long orderId) {
         VoucherOrder order = voucherOrderService.getById(orderId);
-        if (order == null) {
+        if (order != null) {
+            return Result.ok(order.getStatus());
+        }
+
+        UserDTO user = UserHolder.getUser();
+        String pendingUserId = stringRedisTemplate.opsForValue().get(SECKILL_ORDER_PENDING_KEY + orderId);
+        if (!StringUtils.hasText(pendingUserId)) {
             return Result.fail("订单不存在");
         }
-        return Result.ok(order.getStatus());
+        if (user == null || user.getId() == null || !pendingUserId.equals(String.valueOf(user.getId()))) {
+            return Result.fail("订单不属于当前用户");
+        }
+        return Result.ok(0);
     }
 }

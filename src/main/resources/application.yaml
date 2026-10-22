@@ -18,7 +18,7 @@ spring:
           temperature: ${SPRING_AI_OPENAI_CHAT_TEMPERATURE:0.3}
       embedding:
         options:
-          model: ${SPRING_AI_OPENAI_EMBEDDING_MODEL:text-embedding-v3}
+          model: ${SPRING_AI_OPENAI_EMBEDDING_MODEL:text-embedding-v4}
     vectorstore:
       milvus:
         initialize-schema: ${SPRING_AI_MILVUS_INITIALIZE_SCHEMA:true}
@@ -38,14 +38,7 @@ spring:
         max-idle: 10
         min-idle: 1
         time-between-eviction-runs: 10s
-  rabbitmq:
-    host: 127.0.0.1
-    port: 5672
-    username: "luminawalk"
-    password: "password"
-    virtual-host: /
-    publisher-confirm-type: correlated
-    publisher-returns: true
+
   jackson:
     default-property-inclusion: non_null
 
@@ -53,6 +46,11 @@ mybatis-plus:
   type-aliases-package: com.luminawalk.entity # 别名扫描包
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+rocketmq:
+  name-server: localhost:9876
+  producer:
+    group: hmdp-producer-group
 
 logging:
   level:
@@ -62,6 +60,9 @@ logging:
 
 ai:
   agent:
+    bootstrap:
+      enabled: ${AI_AGENT_BOOTSTRAP_ENABLED:true}
+      fail-fast: ${AI_AGENT_BOOTSTRAP_FAIL_FAST:false}
     memory:
       window-size: ${AI_AGENT_MEMORY_WINDOW_SIZE:8}
     model:
@@ -69,6 +70,10 @@ ai:
       read-timeout-seconds: ${AI_AGENT_MODEL_READ_TIMEOUT_SECONDS:90}
       write-timeout-seconds: ${AI_AGENT_MODEL_WRITE_TIMEOUT_SECONDS:90}
       call-timeout-seconds: ${AI_AGENT_MODEL_CALL_TIMEOUT_SECONDS:120}
+    streaming:
+      enabled: ${AI_AGENT_STREAMING_ENABLED:true}
+      timeout-seconds: ${AI_AGENT_STREAMING_TIMEOUT_SECONDS:75}
+      fallback-chunk-size: ${AI_AGENT_STREAMING_FALLBACK_CHUNK_SIZE:24}
     insight:
       max-review-samples: ${AI_AGENT_INSIGHT_MAX_REVIEW_SAMPLES:8}
       max-review-chars-per-sample: ${AI_AGENT_INSIGHT_MAX_REVIEW_CHARS_PER_SAMPLE:280}
@@ -85,3 +90,21 @@ ai:
         knowledge: knowledge_vector
         shop-profile: shop_profile_vector
         blog-review: blog_review_vector
+    mcp:
+      enabled: ${AI_AGENT_MCP_ENABLED:false}
+      timeout-millis: ${AI_AGENT_MCP_TIMEOUT_MILLIS:2500}
+      tool-whitelist:
+        - ${AI_AGENT_MCP_ROUTE_TOOL_NAME:route_plan}
+        - ${AI_AGENT_MCP_WEATHER_TOOL_NAME:weather_brief}
+      route:
+        enabled: ${AI_AGENT_MCP_ROUTE_ENABLED:false}
+        base-url: ${AI_AGENT_MCP_ROUTE_BASE_URL:}
+        invoke-path: ${AI_AGENT_MCP_ROUTE_INVOKE_PATH:/tools/invoke}
+        api-key: ${AI_AGENT_MCP_ROUTE_API_KEY:}
+        tool-name: ${AI_AGENT_MCP_ROUTE_TOOL_NAME:route_plan}
+      weather:
+        enabled: ${AI_AGENT_MCP_WEATHER_ENABLED:false}
+        base-url: ${AI_AGENT_MCP_WEATHER_BASE_URL:}
+        invoke-path: ${AI_AGENT_MCP_WEATHER_INVOKE_PATH:/tools/invoke}
+        api-key: ${AI_AGENT_MCP_WEATHER_API_KEY:}
+        tool-name: ${AI_AGENT_MCP_WEATHER_TOOL_NAME:weather_brief}

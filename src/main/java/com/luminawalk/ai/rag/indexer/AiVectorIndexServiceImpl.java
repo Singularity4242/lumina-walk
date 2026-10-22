@@ -26,6 +26,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 
+/**
+ * 向量索引构建器。
+ * 负责把平台知识、店铺画像和探店笔记三类数据写入不同的向量集合。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -91,6 +95,7 @@ public class AiVectorIndexServiceImpl implements AiVectorIndexService {
 
     @Override
     public void ensureInitialized() {
+        // 启动时只做“缺啥补啥”，避免每次启动都全量重建索引。
         if (!aiRagRetriever.hasKnowledgeDocuments()) {
             rebuildKnowledge();
         }
@@ -146,6 +151,7 @@ public class AiVectorIndexServiceImpl implements AiVectorIndexService {
         Resource[] resources = resolver.getResources("classpath:knowledge/*.txt");
         List<Document> indexedDocuments = new ArrayList<>();
         for (Resource resource : resources) {
+            // 平台规则文档会先切块再入库，避免单条文档过长导致召回粒度太粗。
             TextReader reader = new TextReader(resource);
             List<Document> splitDocuments = tokenTextSplitter.apply(reader.get());
             for (int i = 0; i < splitDocuments.size(); i++) {
@@ -182,6 +188,7 @@ public class AiVectorIndexServiceImpl implements AiVectorIndexService {
         metadata.put(AiMetadataConstants.X, shop.getX());
         metadata.put(AiMetadataConstants.Y, shop.getY());
 
+        // 店铺画像文本尽量保留结构化字段，方便向量召回和结果解释共用一份数据。
         String text = """
                 店铺名：%s
                 分类ID：%s
@@ -210,6 +217,7 @@ public class AiVectorIndexServiceImpl implements AiVectorIndexService {
         if (blogs == null || blogs.isEmpty()) {
             return List.of();
         }
+        // 评论向量不只存正文，还补上标题和店铺名，降低纯正文短评的语义损失。
         Map<Long, Shop> shopMap = shopService.list().stream().collect(Collectors.toMap(Shop::getId, shop -> shop));
         List<Document> documents = new ArrayList<>(blogs.size());
         for (Blog blog : blogs) {

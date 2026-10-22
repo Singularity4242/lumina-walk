@@ -1,14 +1,15 @@
 package com.luminawalk.mq;
 
 
-import com.luminawalk.config.QueueConfig;
-import com.luminawalk.entity.VoucherOrder;
-import com.luminawalk.service.ISeckillVoucherService;
+import com.luminawalk.config.RocketMQConstants;
 import com.luminawalk.service.IVoucherOrderService;
 import com.luminawalk.utils.SimpleRedisLock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.apache.rocketmq.spring.annotation.ConsumeMode;
+import org.apache.rocketmq.spring.annotation.MessageModel;
+import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
+import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -19,14 +20,20 @@ import static com.luminawalk.utils.RedisConstants.ORDER_TIMEOUT_LOCK_PREFIX;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class OrderTimeoutListener {
+@RocketMQMessageListener(
+        consumerGroup = RocketMQConstants.ORDER_TIMEOUT_CONSUMER_GROUP,
+        topic = RocketMQConstants.ORDER_TIMEOUT_TOPIC,
+        selectorExpression = RocketMQConstants.ORDER_TIMEOUT_TAG,
+        consumeMode = ConsumeMode.CONCURRENTLY,
+        messageModel = MessageModel.CLUSTERING
+)
+public class OrderTimeoutListener implements RocketMQListener<String> {
 
     private final IVoucherOrderService voucherOrderService;
-    private final ISeckillVoucherService seckillVoucherService;
     private final StringRedisTemplate stringRedisTemplate;
 
-    @RabbitListener(queues = QueueConfig.ORDER_TIMEOUT_QUEUE)
-    public void handleOrderTimeout (String orderIdStr) {
+    @Override
+    public void onMessage(String orderIdStr) {
         log.info("收到订单超时消息：订单ID={}", orderIdStr);
 
         try {
@@ -42,32 +49,13 @@ public class OrderTimeoutListener {
             }
 
             try {
-                VoucherOrder order = voucherOrderService.getById(orderId);
-                if (order == null) {
-                    log.warn("订单不存在，订单ID={}", orderId);
-                    return;
-                }
-
-                if (!VoucherOrder.STATUS_UNPAID.equals(order.getStatus())) {
-                    log.info("订单状态不是未支付，无需关闭，订单ID={}, 状态={}", orderId, order.getStatus());
-                    return;
-                }
-
-                order.setStatus(VoucherOrder.STATUS_CANCELLED);
-                voucherOrderService.updateById(order);
-
-                Long voucherId = order.getVoucherId();
-                seckillVoucherService.update()
-                        .setSql("stock = stock + 1")
-                        .eq("voucher_id", voucherId)
-                        .update();
-
-                log.info("订单超时已关闭，订单ID={}", orderId);
+                voucherOrderService.closeTimeoutOrder(orderId);
             } finally {
                 lock.unlock();
             }
         } catch (Exception e) {
             log.error("订单超时处理异常，订单ID={}", orderIdStr, e);
+            throw new IllegalStateException("订单超时处理失败，订单ID=" + orderIdStr, e);
         }
     }
 }

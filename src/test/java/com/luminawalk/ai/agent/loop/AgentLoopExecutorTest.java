@@ -3,7 +3,7 @@ package com.luminawalk.ai.agent.loop;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
-
+import com.luminawalk.component.AgentLoopObserver;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -19,7 +19,8 @@ class AgentLoopExecutorTest {
         ManualToolAgentLoopExecutor manualToolAgentLoopExecutor = mock(ManualToolAgentLoopExecutor.class);
         AgentLoopExecution execution = new AgentLoopExecution();
         execution.setFinalAnswer("ok");
-        when(manualToolAgentLoopExecutor.execute(any(AgentLoopRequest.class), anyList())).thenReturn(execution);
+        when(manualToolAgentLoopExecutor.execute(any(AgentLoopRequest.class), anyList(), any(AgentLoopObserver.class)))
+                .thenReturn(execution);
 
         AgentLoopExecutor executor = new AgentLoopExecutor(manualToolAgentLoopExecutor);
         AgentLoopRequest request = new AgentLoopRequest();
@@ -30,6 +31,6 @@ class AgentLoopExecutorTest {
 
         assertEquals("MULTI_AGENT", result.getScene());
         assertNotNull(result.getAgentLoopExecution());
-        verify(manualToolAgentLoopExecutor).execute(any(AgentLoopRequest.class), anyList());
+        verify(manualToolAgentLoopExecutor).execute(any(AgentLoopRequest.class), anyList(), any(AgentLoopObserver.class));
     }
 }

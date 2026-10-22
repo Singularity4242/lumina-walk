@@ -1,6 +1,7 @@
 package com.luminawalk.ai.component;
 
 import com.luminawalk.ai.rag.indexer.AiVectorIndexService;
+import com.luminawalk.ai.config.AiAgentProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,9 +15,24 @@ public class KnowledgeBaseInitializer {
 
     private final AiVectorIndexService aiVectorIndexService;
 
+    private final AiAgentProperties aiAgentProperties;
+
     @PostConstruct
     public void init() {
+        if (!aiAgentProperties.getBootstrap().isEnabled()) {
+            log.info(">>>>>> [AI-AGENT] vector index bootstrap disabled by config");
+            return;
+        }
+
         log.info(">>>>>> [AI-AGENT] checking vector indexes...");
-        aiVectorIndexService.ensureInitialized();
+        try {
+            aiVectorIndexService.ensureInitialized();
+            log.info(">>>>>> [AI-AGENT] vector index bootstrap finished");
+        } catch (Exception e) {
+            if (aiAgentProperties.getBootstrap().isFailFast()) {
+                throw e;
+            }
+            log.warn(">>>>>> [AI-AGENT] vector index bootstrap skipped: {}", e.getMessage(), e);
+        }
     }
 }

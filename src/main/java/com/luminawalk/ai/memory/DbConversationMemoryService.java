@@ -79,28 +79,38 @@ public class DbConversationMemoryService implements ConversationMemoryService {
 
     @Override
     @Transactional
-    public void appendUserMessage(Long conversationId, String content) {
-        saveMessage(conversationId, "user", content, null, null);
+    public AiMessage appendUserMessage(Long conversationId, String content) {
+        return saveMessage(conversationId, "user", content, null, null);
     }
 
     @Override
     @Transactional
-    public void appendAssistantMessage(Long conversationId, String content) {
-        saveMessage(conversationId, "assistant", content, null, null);
+    public AiMessage appendAssistantMessage(Long conversationId, String content) {
+        return saveMessage(conversationId, "assistant", content, null, null);
     }
 
     @Override
     @Transactional
-    public void appendToolMessage(Long conversationId, String toolName, Object payload) {
-        saveMessage(conversationId, "tool", summarizePayload(payload), toolName, summarizePayload(payload));
+    public AiMessage appendToolMessage(Long conversationId, String toolName, Object payload) {
+        String summary = summarizePayload(payload);
+        return saveMessage(conversationId, "tool", summary, toolName, summary);
     }
 
     @Override
     public List<Message> loadRecentMessages(Long conversationId, int windowSize) {
+        return loadRecentMessagesBefore(conversationId, null, windowSize);
+    }
+
+    @Override
+    public List<Message> loadRecentMessagesBefore(Long conversationId, Long beforeMessageId, int windowSize) {
         int messageLimit = Math.max(windowSize * 2, 1);
-        List<AiMessage> messages = messageService.lambdaQuery()
+        var query = messageService.lambdaQuery()
                 .eq(AiMessage::getConversationId, conversationId)
-                .in(AiMessage::getRole, List.of("user", "assistant"))
+                .in(AiMessage::getRole, List.of("user", "assistant"));
+        if (beforeMessageId != null) {
+            query.lt(AiMessage::getId, beforeMessageId);
+        }
+        List<AiMessage> messages = query
                 .orderByDesc(AiMessage::getId)
                 .last("limit " + messageLimit)
                 .list();
@@ -118,6 +128,18 @@ public class DbConversationMemoryService implements ConversationMemoryService {
             }
         }
         return promptMessages;
+    }
+
+    @Override
+    public void ensureConversationOwnership(Long userId, Long conversationId) {
+        boolean exists = conversationService.lambdaQuery()
+                .eq(AiConversation::getId, conversationId)
+                .eq(AiConversation::getUserId, userId)
+                .eq(AiConversation::getStatus, ACTIVE_STATUS)
+                .exists();
+        if (!exists) {
+            throw new IllegalArgumentException("会话不存在或无权限访问");
+        }
     }
 
     @Override
@@ -144,18 +166,7 @@ public class DbConversationMemoryService implements ConversationMemoryService {
                 .toList();
     }
 
-    private void ensureConversationOwnership(Long userId, Long conversationId) {
-        boolean exists = conversationService.lambdaQuery()
-                .eq(AiConversation::getId, conversationId)
-                .eq(AiConversation::getUserId, userId)
-                .eq(AiConversation::getStatus, ACTIVE_STATUS)
-                .exists();
-        if (!exists) {
-            throw new IllegalArgumentException("会话不存在或无权限访问");
-        }
-    }
-
-    private void saveMessage(Long conversationId, String role, String content, String toolName, String toolPayload) {
+    private AiMessage saveMessage(Long conversationId, String role, String content, String toolName, String toolPayload) {
         AiMessage message = new AiMessage()
                 .setConversationId(conversationId)
                 .setRole(role)
@@ -164,6 +175,7 @@ public class DbConversationMemoryService implements ConversationMemoryService {
                 .setToolPayload(toolPayload)
                 .setCreateTime(LocalDateTime.now());
         messageService.save(message);
+        return message;
     }
 
     private String summarizePayload(Object payload) {

@@ -4,6 +4,8 @@ package com.luminawalk.ai.config;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @ConfigurationProperties(prefix = "ai.agent")
@@ -18,6 +20,12 @@ public class AiAgentProperties {
     private Insight insight = new Insight();
 
     private MultiAgent multiAgent = new MultiAgent();
+
+    private Bootstrap bootstrap = new Bootstrap();
+
+    private Streaming streaming = new Streaming();
+
+    private Mcp mcp = new Mcp();
 
     @Data
     public static class Memory {
@@ -55,9 +63,47 @@ public class AiAgentProperties {
     }
 
     @Data
+    public static class Bootstrap {
+        private boolean enabled = true;
+        private boolean failFast = false;
+    }
+
+    @Data
+    public static class Streaming {
+        private boolean enabled = true;
+        private int timeoutSeconds = 45;
+        private int fallbackChunkSize = 24;
+    }
+
+    @Data
+    public static class Mcp {
+        private boolean enabled = false;
+        private int timeoutMillis = 2500;
+        private List<String> toolWhitelist = new ArrayList<>(List.of("route_plan", "weather_brief"));
+        private McpServer route = defaultServer("route_plan");
+        private McpServer weather = defaultServer("weather_brief");
+    }
+
+    @Data
+    public static class McpServer {
+        private boolean enabled = false;
+        private String baseUrl;
+        private String invokePath = "/tools/invoke";
+        private String apiKey;
+        private String toolName;
+    }
+
+
+    @Data
     public static class Collections {
         private String knowledge = "knowledge_vector";
         private String shopProfile = "shop_profile_vector";
         private String blogReview = "blog_review_vector";
+    }
+
+    private static McpServer defaultServer(String toolName) {
+        McpServer server = new McpServer();
+        server.setToolName(toolName);
+        return server;
     }
 }

@@ -30,7 +30,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.List;
 import java.time.Duration;
 
-
+/**
+ * AI 基础设施配置。
+ * 这里主要负责两件事：模型调用超时控制，以及 Milvus 向量集合的初始化与兼容处理。
+ */
 @Slf4j
 @Configuration
 @EnableConfigurationProperties(AiAgentProperties.class)
@@ -39,6 +42,7 @@ public class CommonConfiguration {
         @Bean
         public RestClientCustomizer aiRestClientCustomizer(AiAgentProperties properties) {
             return builder -> {
+                // AI 调用一旦卡住会直接拖慢 AgentLoop，这里统一收口网络超时配置。
                 OkHttpClient okHttpClient = new OkHttpClient.Builder()
                         .connectTimeout(Duration.ofSeconds(properties.getModel().getConnectTimeoutSeconds()))
                         .readTimeout(Duration.ofSeconds(properties.getModel().getReadTimeoutSeconds()))
@@ -62,6 +66,7 @@ public class CommonConfiguration {
                     ? vectorStoreProperties.getDatabaseName()
                     : MilvusVectorStore.DEFAULT_DATABASE_NAME;
 
+            // 如果业务配置了非默认数据库，先用管理连接确保数据库存在，再切换到目标库。
             if (!MilvusVectorStore.DEFAULT_DATABASE_NAME.equals(databaseName)) {
                 MilvusServiceClient adminClient = new MilvusServiceClient(baseConnectParamBuilder(clientProperties).build());
                 ensureDatabaseExists(adminClient, databaseName);
@@ -103,6 +108,7 @@ public class CommonConfiguration {
                                          String collectionName) {
         String databaseName = properties.getDatabaseName();
         int embeddingDimension = properties.getEmbeddingDimension() > 0 ? properties.getEmbeddingDimension() : 1024;
+        // 向量维度变更时，旧 collection 继续复用会直接报错，这里启动时先做一次防御性检查。
         resetCollectionIfDimensionMismatch(milvusServiceClient, databaseName, collectionName, embeddingDimension, properties.isInitializeSchema());
         return MilvusVectorStore.builder(milvusServiceClient, embeddingModel)
                 .databaseName(databaseName)
@@ -115,6 +121,7 @@ public class CommonConfiguration {
 
     private BatchingStrategy fixedSizeBatchingStrategy(int batchSize) {
         return documents -> {
+            // 控制单批 embedding 的体积，避免一次塞太多文档把远程模型压超时。
             List<List<Document>> batches = new ArrayList<>();
             for (int i = 0; i < documents.size(); i += batchSize) {
                 batches.add(documents.subList(i, Math.min(i + batchSize, documents.size())));
@@ -161,6 +168,7 @@ public class CommonConfiguration {
                         + "。请开启 initialize-schema 或手工删除旧 collection。");
             }
 
+            // 自动删库重建的前提是应用明确允许初始化 schema，否则宁可启动失败也不做隐式破坏。
             log.warn("Milvus collection {} dimension mismatch: actual={}, expected={}. Dropping and recreating it.",
                     collectionName, actualDimension, expectedDimension);
             client.dropCollection(DropCollectionParam.newBuilder()

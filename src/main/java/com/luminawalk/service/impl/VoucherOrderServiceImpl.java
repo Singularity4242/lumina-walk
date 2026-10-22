@@ -1,37 +1,58 @@
 package com.luminawalk.service.impl;
 
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.luminawalk.config.RocketMQConstants;
 import com.luminawalk.dto.Result;
-import com.luminawalk.config.QueueConfig;
+import com.luminawalk.entity.SeckillVoucher;
+import com.luminawalk.entity.Voucher;
 import com.luminawalk.entity.VoucherOrder;
 import com.luminawalk.mapper.VoucherOrderMapper;
+import com.luminawalk.service.ISeckillVoucherService;
 import com.luminawalk.service.IVoucherOrderService;
+import com.luminawalk.service.IVoucherService;
 import com.luminawalk.utils.RedisIdWorker;
 import com.luminawalk.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Collections;
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
-import static com.luminawalk.utils.RedisConstants.ORDER_PAYMENT_LOCK_PREFIX;
+import static com.luminawalk.utils.RedisConstants.SECKILL_ORDER_PENDING_KEY;
+import static com.luminawalk.utils.RedisConstants.SECKILL_ORDER_PENDING_TTL_MINUTES;
+import static com.luminawalk.utils.RedisConstants.SECKILL_STOCK_KEY;
 
 @Slf4j
 @Service
 public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> implements IVoucherOrderService {
+
+    private static final String SECKILL_ORDER_KEY_PREFIX = "seckill:order:";
+    private static final int SECKILL_RESULT_OUT_OF_STOCK = 1;
+    private static final int SECKILL_RESULT_DUPLICATE = 2;
+    private static final int SECKILL_RESULT_STOCK_NOT_READY = 3;
 
     @Resource
     private RedisIdWorker redisIdWorker;
     @Resource
     private StringRedisTemplate stringRedisTemplate;
     @Resource
-    private RabbitTemplate rabbitTemplate;
+    private RocketMQTemplate rocketMQTemplate;
+    @Resource
+    private ISeckillVoucherService seckillVoucherService;
+    @Resource
+    private IVoucherService voucherService;
+    @Resource
+    private ObjectMapper objectMapper;
 
     private static final DefaultRedisScript<Long> SECKILL_SCRIPT;
 
@@ -42,22 +63,71 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result buyVoucher(Long voucherId) {
+        Long userId = UserHolder.getUser().getId();
+        Voucher voucher = voucherService.getById(voucherId);
+        if (voucher == null || !Integer.valueOf(1).equals(voucher.getStatus())) {
+            return Result.fail("优惠券不存在或已下架");
+        }
+        if (Integer.valueOf(1).equals(voucher.getType())) {
+            return Result.fail("该优惠券为秒杀券，请使用秒杀方式购买");
+        }
+
+        long orderId = redisIdWorker.nextId("order");
+        VoucherOrder order = new VoucherOrder();
+        order.setId(orderId);
+        order.setUserId(userId);
+        order.setVoucherId(voucherId);
+        order.setStatus(VoucherOrder.STATUS_UNPAID);
+        order.setCreateTime(LocalDateTime.now());
+        order.setUpdateTime(LocalDateTime.now());
+
+        boolean saved = save(order);
+        if (!saved) {
+            return Result.fail("普通券订单创建失败，请稍后重试");
+        }
+        return Result.ok(orderId);
+    }
+
+
+    @Override
     public Result seckillVoucher(Long voucherId) {
         Long userId = UserHolder.getUser().getId();
         long orderId = redisIdWorker.nextId("order");
 
-        // 1. 执行 Lua 脚本
-        // 作用：只在 Redis 层面判断资格和预扣减库存
-        Long result = stringRedisTemplate.execute(
-                SECKILL_SCRIPT,
-                Collections.emptyList(),
-                voucherId.toString(), userId.toString()
-        );
+        Long result = executeSeckillScript(voucherId, userId);
+        if (result == null) {
+            log.error("秒杀脚本执行结果为空，voucherId={}, userId={}", voucherId, userId);
+            return Result.fail("系统繁忙，请稍后重试");
+        }
 
         int r = result.intValue();
-        // 2. 判断结果
+
+        if (r == SECKILL_RESULT_STOCK_NOT_READY) {
+            if (!tryWarmupSeckillStock(voucherId)) {
+                log.warn("秒杀券不存在或未配置库存，voucherId={}", voucherId);
+                return Result.fail("该优惠券未配置秒杀活动或库存");
+            }
+            result = executeSeckillScript(voucherId, userId);
+            if (result == null) {
+                return Result.fail("系统繁忙，请稍后重试");
+            }
+            r = result.intValue();
+        }
+
         if (r != 0) {
-            return Result.fail(r == 1 ? "库存不足" : "不能重复下单");
+            if (r == SECKILL_RESULT_OUT_OF_STOCK) {
+                return Result.fail("库存不足");
+            }
+            if (r == SECKILL_RESULT_DUPLICATE) {
+                return Result.fail("不能重复下单");
+            }
+            if (r == SECKILL_RESULT_STOCK_NOT_READY) {
+                log.warn("秒杀库存初始化后仍未生效，voucherId={}", voucherId);
+                return Result.fail("秒杀库存未初始化，请稍后重试");
+            }
+            return Result.fail("系统繁忙，请稍后重试");
         }
 
         // 3. 封装订单消息
@@ -70,27 +140,138 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         order.setCreateTime(now);
         order.setUpdateTime(now);
 
-        // 4. 发送 RabbitMQ 消息保存订单
-        String jsonStr = JSONUtil.toJsonStr(order);
+
+        markOrderPending(orderId, userId);
         try {
-            rabbitTemplate.convertAndSend("Common", "CQ", jsonStr);
+            rocketMQTemplate.syncSend(RocketMQConstants.SECKILL_ORDER_DESTINATION, objectMapper.writeValueAsString(order));
+        } catch (JsonProcessingException e) {
+            clearOrderPending(orderId);
+            rollbackSeckillReservation(voucherId, userId);
+            log.error("秒杀订单序列化失败，订单ID={}", orderId, e);
+            return Result.fail("订单创建失败，请稍后重试");
         } catch (Exception e) {
-            log.error("RabbitMQ 消息发送失败，订单ID: {}", orderId, e);
+            clearOrderPending(orderId);
+            rollbackSeckillReservation(voucherId, userId);
+            log.error("RocketMQ 秒杀订单消息发送失败，订单ID: {}", orderId, e);
             return Result.fail("系统繁忙，请稍后重试");
         }
 
         // 5. 发送超时检查消息；延迟队列中的消息 15 分钟后进入超时队列。
         // 当前上游提交尚未提供超时队列消费者，发送消息本身不会关闭订单。
         try {
-            rabbitTemplate.convertAndSend(
-                    QueueConfig.ORDER_DELAY_EXCHANGE,
-                    QueueConfig.ORDER_DELAY_ROUTING_KEY,
-                    String.valueOf(orderId));
+            rocketMQTemplate.syncSendDelayTimeMills(
+                    RocketMQConstants.ORDER_TIMEOUT_DESTINATION,
+                    String.valueOf(orderId),
+                    RocketMQConstants.ORDER_PAYMENT_TIMEOUT_MILLIS);
             log.info("订单超时检查消息已发送，订单ID={}", orderId);
         } catch (Exception e) {
             log.error("订单超时检查消息发送失败，订单ID: {}", orderId, e);
         }
 
         return Result.ok(orderId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void createVoucherOrder(VoucherOrder voucherOrder) {
+        VoucherOrder existingOrder = getById(voucherOrder.getId());
+        if (existingOrder != null) {
+            log.warn("秒杀订单已存在，忽略重复消息，订单ID={}", voucherOrder.getId());
+            clearOrderPending(voucherOrder.getId());
+            return;
+        }
+
+        boolean saved = save(voucherOrder);
+        if (!saved) {
+            rollbackSeckillReservation(voucherOrder.getVoucherId(), voucherOrder.getUserId());
+            throw new IllegalStateException("保存秒杀订单失败，订单ID=" + voucherOrder.getId());
+        }
+
+        boolean stockUpdated = seckillVoucherService.update()
+                .setSql("stock = stock - 1")
+                .eq("voucher_id", voucherOrder.getVoucherId())
+                .gt("stock", 0)
+                .update();
+        if (!stockUpdated) {
+            rollbackSeckillReservation(voucherOrder.getVoucherId(), voucherOrder.getUserId());
+            throw new IllegalStateException("扣减秒杀库存失败，券ID=" + voucherOrder.getVoucherId());
+        }
+
+        clearOrderPending(voucherOrder.getId());
+        log.info("秒杀订单落库成功，订单ID={}", voucherOrder.getId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void closeTimeoutOrder(Long orderId) {
+        VoucherOrder order = getById(orderId);
+        if (order == null) {
+            log.warn("订单不存在，订单ID={}", orderId);
+            clearOrderPending(orderId);
+            return;
+        }
+
+        if (!VoucherOrder.STATUS_UNPAID.equals(order.getStatus())) {
+            log.info("订单状态不是未支付，无需关闭，订单ID={}, 状态={}", orderId, order.getStatus());
+            return;
+        }
+
+        order.setStatus(VoucherOrder.STATUS_CANCELLED);
+        order.setUpdateTime(LocalDateTime.now());
+        if (!updateById(order)) {
+            throw new IllegalStateException("关闭超时订单失败，订单ID=" + orderId);
+        }
+
+        boolean stockUpdated = seckillVoucherService.update()
+                .setSql("stock = stock + 1")
+                .eq("voucher_id", order.getVoucherId())
+                .update();
+        if (!stockUpdated) {
+            throw new IllegalStateException("回滚秒杀库存失败，订单ID=" + orderId);
+        }
+
+        rollbackSeckillReservation(order.getVoucherId(), order.getUserId());
+        clearOrderPending(orderId);
+        log.info("订单超时已关闭，订单ID={}", orderId);
+    }
+
+    private Long executeSeckillScript(Long voucherId, Long userId) {
+        return stringRedisTemplate.execute(
+                SECKILL_SCRIPT,
+                Collections.emptyList(),
+                voucherId.toString(), userId.toString()
+        );
+    }
+
+    private boolean tryWarmupSeckillStock(Long voucherId) {
+        SeckillVoucher seckillVoucher = seckillVoucherService.getById(voucherId);
+        if (seckillVoucher == null || seckillVoucher.getStock() == null) {
+            return false;
+        }
+        stringRedisTemplate.opsForValue().set(SECKILL_STOCK_KEY + voucherId, seckillVoucher.getStock().toString());
+        log.info("检测到秒杀库存缺失，已按需补热到 Redis，voucherId={}, stock={}", voucherId, seckillVoucher.getStock());
+        return true;
+    }
+
+    private void markOrderPending(Long orderId, Long userId) {
+        stringRedisTemplate.opsForValue().set(
+                SECKILL_ORDER_PENDING_KEY + orderId,
+                String.valueOf(userId),
+                SECKILL_ORDER_PENDING_TTL_MINUTES,
+                TimeUnit.MINUTES
+        );
+    }
+
+    private void clearOrderPending(Long orderId) {
+        stringRedisTemplate.delete(SECKILL_ORDER_PENDING_KEY + orderId);
+    }
+
+    private void rollbackSeckillReservation(Long voucherId, Long userId) {
+        try {
+            stringRedisTemplate.opsForValue().increment(SECKILL_STOCK_KEY + voucherId);
+            stringRedisTemplate.opsForSet().remove(SECKILL_ORDER_KEY_PREFIX + voucherId, String.valueOf(userId));
+        } catch (Exception e) {
+            log.error("回滚 Redis 秒杀占用失败，voucherId={}, userId={}", voucherId, userId, e);
+        }
     }
 }

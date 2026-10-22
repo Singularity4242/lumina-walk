@@ -20,6 +20,17 @@ public class MvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new LoginInterceptor())
                 .excludePathPatterns(
+                        "/",
+                        "/index.html",
+                        "/favicon.ico",
+                        "/error",
+                        "/**/*.css",
+                        "/**/*.js",
+                        "/**/*.png",
+                        "/**/*.jpg",
+                        "/**/*.jpeg",
+                        "/**/*.svg",
+                        "/**/*.ico",
                         "/shop/**",
                         "/voucher/**",
                         "/shop-type/**",

@@ -16,6 +16,7 @@
     <properties>
         <java.version>17</java.version>
         <spring-ai.version>1.0.3</spring-ai.version>
+        <rocketmq-spring.version>2.3.3</rocketmq-spring.version>
     </properties>
 
     <dependencies>
@@ -26,8 +27,9 @@
         </dependency>
 
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-amqp</artifactId>
+            <groupId>org.apache.rocketmq</groupId>
+            <artifactId>rocketmq-spring-boot-starter</artifactId>
+            <version>${rocketmq-spring.version}</version>
         </dependency>
 
         <dependency>

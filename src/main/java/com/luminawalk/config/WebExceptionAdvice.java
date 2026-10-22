@@ -16,10 +16,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class WebExceptionAdvice {
 
+
     @ExceptionHandler(RateLimitExceededException.class)
-    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
     public Result handleRateLimitExceededException(RateLimitExceededException e) {
-        return Result.fail(e.getMessage());
+        log.warn("请求触发限流: {}", e.getMessage());
+        return Result.fail("AI 请求过于频繁，请稍后再试");
     }
 
     @ExceptionHandler(RuntimeException.class)

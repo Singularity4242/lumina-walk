@@ -2,6 +2,7 @@ package com.luminawalk.ai.agent.loop;
 
 import com.luminawalk.ai.tool.AgentLoopControlTools;
 import com.luminawalk.ai.tool.DianPingAgentTools;
+import com.luminawalk.ai.tool.McpLocalLifeTools;
 import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Component;
@@ -11,6 +12,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 本地工具注册表。
+ * 这里把项目内的 @Tool 方法转换成 Spring AI 的 ToolCallback，供 AgentLoop 手动调用。
+ */
 @Component
 public class AgentLoopToolRegistry {
     private final List<ToolCallback> toolCallbacks;
@@ -18,10 +23,13 @@ public class AgentLoopToolRegistry {
     private final Map<String, ToolCallback> callbackMap;
 
     @org.springframework.beans.factory.annotation.Autowired
-    public AgentLoopToolRegistry(DianPingAgentTools dianPingAgentTools, AgentLoopControlTools controlTools) {
-        this(Arrays.asList(ToolCallbacks.from(dianPingAgentTools, controlTools)));
+    public AgentLoopToolRegistry(DianPingAgentTools dianPingAgentTools,
+                                 AgentLoopControlTools controlTools,
+                                 McpLocalLifeTools mcpLocalLifeTools) {
+        this(Arrays.asList(ToolCallbacks.from(dianPingAgentTools, controlTools, mcpLocalLifeTools)));
     }
 
+    // 这个构造器只给测试使用，便于注入假的 ToolCallback 集合。
     AgentLoopToolRegistry(List<ToolCallback> toolCallbacks) {
         this.toolCallbacks = List.copyOf(toolCallbacks);
         Map<String, ToolCallback> map = new LinkedHashMap<>();

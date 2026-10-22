@@ -153,16 +153,6 @@ public class PaymentController {
      */
     @GetMapping("/status/{id}")
     public Result getPaymentStatus(@PathVariable("id") Long orderId) {
-        Long userId = UserHolder.getUser().getId();
-
-        VoucherOrder order = voucherOrderService.getById(orderId);
-        if (order == null) {
-            return Result.fail("订单不存在");
-        }
-
-        if (!order.getUserId().equals(userId)) {
-            return Result.fail("订单不属于当前用户");
-        }
 
         return paymentService.checkPaymentStatus(orderId);
     }

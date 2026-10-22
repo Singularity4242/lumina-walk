@@ -29,6 +29,11 @@ import java.util.Set;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+
+/**
+ * RAG 检索入口。
+ * 当前同时负责知识库、店铺画像、探店评论三类向量检索，以及知识库的文本兜底召回。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -51,6 +56,7 @@ public class AiRagRetriever {
 
     public List<KnowledgeHitDTO> searchKnowledge(String query, Filter.Expression filterExpression) {
         Set<String> keywords = extractKeywords(query);
+        // 先走向量召回，再用关键词兜底补强平台规则这类高确定性知识。
         List<KnowledgeHitDTO> vectorHits = knowledgeVectorStore.similaritySearch(
                         buildSearchRequest(query, aiAgentProperties.getRag().getTopK(), aiAgentProperties.getRag().getKnowledgeSimilarityThreshold(), filterExpression))
                 .stream()
@@ -132,6 +138,7 @@ public class AiRagRetriever {
             return List.of();
         }
 
+        // 兜底方案直接扫 classpath 下的知识文本，避免向量库弱召回时“明明有文档却答不上来”。
         List<KnowledgeHitDTO> results = new ArrayList<>();
         PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
         try {
@@ -214,6 +221,8 @@ public class AiRagRetriever {
         if (!StringUtils.hasText(normalized)) {
             return Set.of();
         }
+
+        // 这里不是通用分词器，而是非常轻量的业务关键词抽取，目标只是给 fallback 检索加召回。
         List<String> stopWords = Arrays.asList("请问", "一下", "什么", "哪些", "有啥", "有什么", "怎么", "可以", "告诉我", "我想", "呢", "吗");
         for (String stopWord : stopWords) {
             normalized = normalized.replace(stopWord, "");
