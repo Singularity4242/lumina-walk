@@ -14,7 +14,7 @@
 </template>
 
 <script setup>
-import { Grid, House, MagicStick, User } from '@element-plus/icons-vue';
+import { Grid, House, User } from '@element-plus/icons-vue';
 
 defineProps({
   currentTab: {
@@ -24,10 +24,9 @@ defineProps({
 });
 
 const navItems = [
-  { name: 'home', label: '首页', path: '/', icon: House },
-  { name: 'category', label: '分类', path: '/category', icon: Grid },
-  { name: 'profile', label: '我的', path: '/profile', icon: User },
-  { name: 'ai', label: 'AI助手', path: '/ai-assistant', icon: MagicStick }
+  { name: 'home', label: '灵感', path: '/', icon: House },
+  { name: 'category', label: '宝藏地点', path: '/category', icon: Grid },
+  { name: 'profile', label: '我的', path: '/profile', icon: User }
 ];
 </script>
 
@@ -39,8 +38,8 @@ const navItems = [
   transform: translateX(-50%);
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  width: min(680px, calc(100% - 20px));
+  grid-template-columns: repeat(3, 1fr);
+  width: min(440px, calc(100% - 20px));
   padding: 10px 8px;
   border-radius: 18px;
 }
@@ -59,11 +58,17 @@ const navItems = [
 .nav-item:hover,
 .nav-item.active {
   color: var(--dp-primary);
-  background: #fff3eb;
+  background: var(--dp-primary-light);
 }
 
 .nav-item span {
   font-size: 12px;
+}
+
+@media (min-width: 768px) {
+  .bottom-nav {
+    display: none;
+  }
 }
 
 @media (max-width: 767px) {

@@ -3,7 +3,7 @@
     <div class="page-container">
       <section v-if="!userStore.isLoggedIn" class="empty-login card-panel">
         <h2>登录后查看个人中心</h2>
-        <p>你可以使用后端短信验证码登录，联调当前 Spring Boot 接口。</p>
+        <p>登录后收藏拍摄地点、分享摄影笔记、查看本机购券记录。验证码为模拟演示。</p>
         <el-button type="primary" @click="userStore.openLoginDialog()">立即登录</el-button>
       </section>
 
@@ -13,7 +13,7 @@
             <el-avatar :src="profile.avatar" :size="88" />
             <div>
               <h1>{{ profile.nickname }}</h1>
-              <p>欢迎回来，今天也去发现一家值得安利的宝藏店铺吧。</p>
+              <p>把走过的地方，变成你的光影手记。</p>
             </div>
           </div>
           <div class="profile-actions">
@@ -35,7 +35,7 @@
         <section class="card-panel menu-panel">
           <div class="section-title">
             <h2>常用功能</h2>
-            <p>个人中心基础能力入口，均已接通实际交互</p>
+            <p>管理你的收藏、笔记与使用偏好</p>
           </div>
           <div class="menu-list">
             <button
@@ -53,7 +53,7 @@
         <section class="card-panel blog-panel">
           <div class="section-title">
             <h2>我的笔记</h2>
-            <p>真实联调 `/blog/of/me`</p>
+            <p>记录拍摄经验，分享新的发现</p>
           </div>
           <div class="my-blog-list">
             <article v-for="blog in myBlogs" :key="blog.id" class="my-blog-item hover-lift">
@@ -63,12 +63,12 @@
                 <div class="blog-meta">
                   <span>点赞 {{ blog.liked || 0 }}</span>
                   <span>评论 {{ blog.comments || 0 }}</span>
-                  <span>店铺ID {{ blog.shopId || '-' }}</span>
+                  <span>地点 ID {{ blog.shopId || '-' }}</span>
                 </div>
               </div>
               <div class="blog-actions">
                 <el-button size="small" @click="viewBlog(blog)">查看详情</el-button>
-                <el-button v-if="blog.shopId" size="small" type="primary" @click="goShop(blog.shopId)">去店铺</el-button>
+                <el-button v-if="blog.shopId" size="small" type="primary" @click="goShop(blog.shopId)">查看地点</el-button>
               </div>
             </article>
             <div v-if="!myBlogs.length" class="empty-block">当前还没有发布笔记</div>
@@ -80,33 +80,35 @@
     <BottomNav current-tab="profile" />
 
     <el-dialog v-model="dialogs.favorites" title="我的收藏" width="760px">
+      <p class="purchase-notice">收藏按账号保存在当前浏览器，不会同步到其他设备。</p>
       <div class="dialog-list">
         <article v-for="shop in favoriteShops" :key="shop.id" class="panel-item hover-lift">
           <div>
             <strong>{{ shop.name }}</strong>
             <p>{{ shop.address }}</p>
-            <span>评分 {{ shop.score }} ｜ 人均 ¥{{ shop.price }}</span>
+            <span v-if="shop.price > 0">参考均价 ¥{{ shop.price }}</span>
           </div>
           <div class="panel-actions">
-            <el-button size="small" @click="goShop(shop.id)">查看店铺</el-button>
+            <el-button size="small" @click="goShop(shop.id)">查看地点</el-button>
             <el-button size="small" type="danger" @click="removeFavorite(shop.id)">取消收藏</el-button>
           </div>
         </article>
-        <div v-if="!favoriteShops.length" class="empty-block">当前还没有收藏店铺</div>
+        <div v-if="!favoriteShops.length" class="empty-block">当前还没有收藏地点</div>
       </div>
     </el-dialog>
 
-    <el-dialog v-model="dialogs.orders" title="我的订单" width="760px">
+    <el-dialog v-model="dialogs.orders" title="本机购券记录" width="760px">
+      <p class="purchase-notice">这里展示当前浏览器保存的订单记录。到店使用以券规则为准；移除记录不会取消订单。</p>
       <div class="dialog-list">
         <article v-for="order in userStore.orderHistory" :key="order.orderId" class="panel-item hover-lift">
           <div>
-            <strong>{{ order.shopName || '未知店铺' }} ｜ {{ order.voucherTitle || '代金券订单' }}</strong>
+            <strong>{{ order.shopName || '未知地点' }} ｜ {{ order.voucherTitle || '器材券订单' }}</strong>
             <p>订单ID：{{ order.orderId }} ｜ 支付金额 ¥{{ order.payAmount || '-' }}</p>
             <span>{{ formatOrderStatus(order.status) }} ｜ {{ formatTime(order.updateTime || order.createdTime) }}</span>
           </div>
           <div class="panel-actions">
             <el-button size="small" @click="refreshOrderStatus(order)">刷新状态</el-button>
-            <el-button v-if="order.shopId" size="small" @click="goShop(order.shopId)">查看店铺</el-button>
+            <el-button v-if="order.shopId" size="small" @click="goShop(order.shopId)">查看地点</el-button>
             <el-button size="small" type="danger" @click="removeOrder(order.orderId)">移除记录</el-button>
           </div>
         </article>
@@ -137,41 +139,40 @@
 
     <el-dialog v-model="dialogs.settings" title="设置" width="520px">
       <div class="setting-actions">
-        <el-button @click="clearAiHistory">清空 AI 记录</el-button>
         <el-button @click="userStore.clearFavorites()">清空收藏</el-button>
         <el-button @click="userStore.clearOrders()">清空订单记录</el-button>
         <el-button type="danger" @click="userStore.logout()">退出登录</el-button>
       </div>
     </el-dialog>
 
-    <el-dialog v-model="dialogs.support" title="联系客服" width="520px">
+    <el-dialog v-model="dialogs.support" title="使用说明" width="520px">
       <div class="support-box">
-        <p>当前前端已联调用户、店铺、博客、优惠券、支付、AI 会话接口。</p>
-        <p>如需排查问题，请提供：操作步骤、接口路径、浏览器控制台报错。</p>
-        <p>建议联系信息：400-800-8083 / support@hmdp.local</p>
+        <p>在这里发现拍摄地点、分享摄影笔记，并购买到店使用的器材抵扣券。</p>
+        <p>购券不代表预留器材；适用范围及线下办理事项请查看券规则。</p>
+        <p>当前为演示项目，未接入真实客服与资金支付。</p>
       </div>
     </el-dialog>
 
-    <el-dialog v-model="dialogs.reviews" title="我的评论" width="760px">
+    <el-dialog v-model="dialogs.reviews" title="我的摄影笔记" width="760px">
       <div class="dialog-list">
         <article v-for="blog in myBlogs" :key="blog.id" class="panel-item hover-lift">
           <div>
             <strong>{{ blog.title || '无标题笔记' }}</strong>
             <p>{{ blog.content || '暂无内容' }}</p>
-            <span>点赞 {{ blog.liked || 0 }} ｜ 评论 {{ blog.comments || 0 }} ｜ 店铺ID {{ blog.shopId || '-' }}</span>
+            <span>点赞 {{ blog.liked || 0 }} ｜ 评论 {{ blog.comments || 0 }} ｜ 地点 ID {{ blog.shopId || '-' }}</span>
           </div>
           <div class="panel-actions">
             <el-button size="small" @click="viewBlog(blog)">查看详情</el-button>
-            <el-button v-if="blog.shopId" size="small" @click="goShop(blog.shopId)">去店铺</el-button>
+            <el-button v-if="blog.shopId" size="small" @click="goShop(blog.shopId)">查看地点</el-button>
           </div>
         </article>
-        <div v-if="!myBlogs.length" class="empty-block">你还没有评论内容</div>
+        <div v-if="!myBlogs.length" class="empty-block">你还没有发布摄影笔记</div>
       </div>
     </el-dialog>
 
     <el-dialog v-model="dialogs.publish" title="发布笔记" width="640px" @close="resetBlogForm">
       <div class="publish-form">
-        <el-input v-model="blogForm.shopId" placeholder="店铺ID（可选）" />
+        <el-input v-model="blogForm.shopId" placeholder="地点 ID（可选）" />
         <el-input v-model="blogForm.title" placeholder="标题" />
         <el-input v-model="blogForm.images" placeholder="图片地址，多个用英文逗号分隔" />
         <el-input
@@ -179,7 +180,7 @@
           type="textarea"
           :rows="6"
           resize="none"
-          placeholder="分享一下你的探店体验"
+          placeholder="分享拍摄时段、光线、构图、器材与注意事项"
         />
         <div class="publish-actions">
           <el-button @click="resetBlogForm">重置</el-button>
@@ -193,7 +194,7 @@
         <div class="dialog-header" v-if="activeBlog">
           <div>
             <h3>{{ activeBlog.title || '无标题笔记' }}</h3>
-            <p>点赞 {{ activeBlog.liked || 0 }} ｜ 评论 {{ activeBlog.comments || 0 }} ｜ 店铺ID {{ activeBlog.shopId || '-' }}</p>
+            <p>点赞 {{ activeBlog.liked || 0 }} ｜ 评论 {{ activeBlog.comments || 0 }} ｜ 地点 ID {{ activeBlog.shopId || '-' }}</p>
           </div>
         </div>
       </template>
@@ -203,7 +204,7 @@
         </div>
         <p class="detail-content">{{ activeBlog.content || '暂无详细内容' }}</p>
         <div class="detail-footer-actions">
-          <el-button v-if="activeBlog.shopId" @click="goShop(activeBlog.shopId)">去店铺</el-button>
+          <el-button v-if="activeBlog.shopId" @click="goShop(activeBlog.shopId)">查看地点</el-button>
         </div>
       </div>
     </el-dialog>
@@ -218,12 +219,10 @@ import { profileApi } from '@/api/modules/profile';
 import { blogApi } from '@/api/modules/blog';
 import { paymentApi } from '@/api/modules/payment';
 import { shopApi } from '@/api/modules/shop';
-import { useAiStore } from '@/store/ai';
 import { useUserStore } from '@/store/user';
 
 const router = useRouter();
 const userStore = useUserStore();
-const aiStore = useAiStore();
 
 const profile = ref({ avatar: '', nickname: '' });
 const myBlogs = ref([]);
@@ -248,14 +247,14 @@ const blogForm = reactive({ shopId: '', title: '', images: '', content: '' });
 const signedToday = computed(() => Number(userStore.signCount) > 0);
 const stats = computed(() => [
   { key: 'favorites', title: '我的收藏', value: userStore.favoriteShopIds.length },
-  { key: 'orders', title: '我的订单', value: userStore.orderHistory.length },
-  { key: 'reviews', title: '我的评论', value: myBlogs.value.length }
+  { key: 'orders', title: '本机购券记录', value: userStore.orderHistory.length },
+  { key: 'reviews', title: '我的摄影笔记', value: myBlogs.value.length }
 ]);
 
 const menuEntries = [
   { key: 'addresses', title: '地址管理' },
   { key: 'settings', title: '设置' },
-  { key: 'support', title: '联系客服' }
+  { key: 'support', title: '使用说明' }
 ];
 
 watch(
@@ -352,11 +351,6 @@ function saveAddress() {
   addressForm.phone = '';
   addressForm.detail = '';
   ElMessage.success('地址已保存');
-}
-
-function clearAiHistory() {
-  aiStore.clearHistory();
-  ElMessage.success('AI 记录已清空');
 }
 
 async function publishBlog() {

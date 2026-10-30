@@ -25,7 +25,7 @@ defineProps({
 <style scoped lang="scss">
 .category-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 14px;
   padding: 18px;
 }

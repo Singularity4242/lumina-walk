@@ -1,5 +1,4 @@
-﻿import request from '@/api/request';
-import { cityOptions } from '@/mock/data';
+import request from '@/api/request';
 import { normalizeCategories, normalizeShop } from '@/utils/shop';
 
 const PAGE_SIZE = 10;
@@ -43,7 +42,7 @@ export const homeApi = {
     const shops = (shopList || []).map((item) => normalizeShop(item));
     return {
       city: params.city || '北京',
-      cityOptions,
+      cityOptions: [],
       categories,
       currentTypeId,
       banners: shops.slice(0, 3),

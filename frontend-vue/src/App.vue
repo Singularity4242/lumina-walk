@@ -1,17 +1,17 @@
-﻿<template>
+<template>
   <div class="app-root">
+    <AppHeader />
     <RouterView v-slot="{ Component, route }">
       <Transition name="route-fade" mode="out-in">
         <component :is="Component" :key="route.fullPath" />
       </Transition>
     </RouterView>
-    <AiAssistantDrawer />
     <LoginDialog />
   </div>
 </template>
 
 <script setup>
-import AiAssistantDrawer from '@/components/ai/AiAssistantDrawer.vue';
+import AppHeader from '@/components/layout/AppHeader.vue';
 import LoginDialog from '@/components/auth/LoginDialog.vue';
 import { useUserStore } from '@/store/user';
 
@@ -35,7 +35,7 @@ function handleAuthExpired() {
 <style scoped>
 .app-root {
   min-height: 100vh;
-  background: #f7f7f7;
+  background: var(--dp-bg-page);
 }
 
 .route-fade-enter-active,

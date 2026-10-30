@@ -1,9 +1,10 @@
-﻿import { createRouter, createWebHashHistory } from 'vue-router';
+import { createRouter, createWebHashHistory } from 'vue-router';
 import HomePage from '@/pages/home/HomePage.vue';
 import CategoryPage from '@/pages/category/CategoryPage.vue';
 import ShopDetailPage from '@/pages/shop/ShopDetailPage.vue';
 import ProfilePage from '@/pages/profile/ProfilePage.vue';
-import AiAssistantPage from '@/pages/ai/AiAssistantPage.vue';
+import BlogDetailPage from '@/pages/blog/BlogDetailPage.vue';
+import SectionPendingPage from '@/pages/common/SectionPendingPage.vue';
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -12,19 +13,43 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: HomePage,
-      meta: { tab: 'home', title: '首页' }
+      meta: { tab: 'home', title: '灵感' }
     },
     {
       path: '/category/:id?',
       name: 'category',
       component: CategoryPage,
-      meta: { tab: 'category', title: '分类' }
+      meta: { tab: 'category', title: '宝藏地点' }
+    },
+    {
+      path: '/blog/:id',
+      name: 'blog-detail',
+      component: BlogDetailPage,
+      meta: { title: '摄影笔记' }
+    },
+    {
+      path: '/gear',
+      name: 'gear',
+      component: SectionPendingPage,
+      meta: { title: '器材' }
+    },
+    {
+      path: '/studios',
+      name: 'studios',
+      component: SectionPendingPage,
+      meta: { title: '专业影棚' }
+    },
+    {
+      path: '/offers',
+      name: 'offers',
+      component: SectionPendingPage,
+      meta: { title: '优惠活动' }
     },
     {
       path: '/shop/:id',
       name: 'shop-detail',
       component: ShopDetailPage,
-      meta: { title: '商家详情' }
+      meta: { title: '地点详情' }
     },
     {
       path: '/profile',
@@ -35,7 +60,7 @@ const router = createRouter({
     {
       path: '/ai-assistant',
       name: 'ai-assistant',
-      component: AiAssistantPage,
+      redirect: '/',
       meta: { tab: 'ai', title: 'AI助手' }
     }
   ],

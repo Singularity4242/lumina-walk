@@ -48,6 +48,11 @@ public class Shop implements Serializable {
     private String area;
 
     /**
+     * 城市，未填写为 null
+     */
+    private String city;
+
+    /**
      * 地址
      */
     private String address;

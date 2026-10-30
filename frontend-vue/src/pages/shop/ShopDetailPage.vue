@@ -9,67 +9,47 @@
           <el-button round @click="toggleFavorite">
             {{ userStore.isFavorite(detail.id) ? '已收藏' : '收藏' }}
           </el-button>
-          <el-button type="primary" round @click="askAiForShop">AI推荐菜品</el-button>
         </div>
       </div>
 
       <section class="hero card-panel">
-        <el-carousel height="300px">
+        <el-carousel v-if="carouselImages.length" height="300px">
           <el-carousel-item v-for="image in carouselImages" :key="image">
             <img class="hero-image" :src="image" :alt="detail.name" />
           </el-carousel-item>
         </el-carousel>
+        <div v-else class="detail-placeholder">LUMINA WALK · 暂无地点图片</div>
 
         <div class="hero-info">
           <div>
             <h1>{{ detail.name }}</h1>
             <div class="score-row">
-              <el-rate :model-value="detail.score" disabled allow-half />
-              <span>{{ detail.score }}</span>
-              <span>人均 ¥{{ detail.price }}</span>
-              <span>{{ detail.distance }}</span>
-              <span class="tag-chip">{{ detail.status }}</span>
+              <span v-if="detail.price > 0">参考均价 ¥{{ detail.price }}</span>
+              <span v-if="detail.distance">{{ detail.distance }}</span>
             </div>
           </div>
 
           <div class="meta-list">
+            <div v-if="detail.city?.trim()"><strong>城市：</strong>{{ detail.city }}</div>
             <div><strong>地址：</strong>{{ detail.address }}</div>
-            <div><strong>电话：</strong>{{ detail.phone }}</div>
-            <div><strong>营业时间：</strong>{{ detail.openHours }}</div>
-            <div><strong>推荐：</strong>{{ detail.recommendText }}</div>
+            <div v-if="detail.openHours"><strong>开放 / 营业时间：</strong>{{ detail.openHours }}</div>
           </div>
 
           <div class="action-row">
-            <el-button @click="toggleFavorite">收藏</el-button>
-            <el-button @click="openNavigation">导航</el-button>
-            <el-button type="primary" @click="askAiForShop">AI助手推荐</el-button>
+            <el-button @click="toggleFavorite">收藏到本机</el-button>
+            <el-button v-if="canNavigate" @click="openNavigation">导航</el-button>
           </div>
         </div>
       </section>
 
       <section class="content-grid">
-        <article class="card-panel dishes-panel">
-          <div class="section-title">
-            <h2>招牌菜品</h2>
-            <p>{{ dishTip }}</p>
-          </div>
-          <div class="dish-list">
-            <div v-for="dish in detail.dishes" :key="dish.name" class="dish-item hover-lift">
-              <img :src="dish.image" :alt="dish.name" />
-              <div>
-                <strong>{{ dish.name }}</strong>
-                <p>{{ dish.desc }}</p>
-                <span>¥{{ dish.price }}</span>
-              </div>
-            </div>
-          </div>
-        </article>
 
         <article class="card-panel offer-panel">
           <div class="section-title">
-            <h2>优惠活动</h2>
-            <p>普通券直购，秒杀券走异步秒杀与支付接口</p>
+            <h2>器材优惠券</h2>
+            <p>线上购买抵扣券，到店按规则使用。</p>
           </div>
+          <p class="purchase-notice">平台仅提供购券。器材租赁或购买、余款、租期、押金及核销由门店线下办理；购券不代表预留器材。当前支付为模拟演示，尚未提供线上核销功能。</p>
           <div class="offer-list">
             <div v-for="voucher in vouchers" :key="voucher.id" class="offer-item hover-lift" :class="{ disabled: !canPurchaseVoucher(voucher) }">
               <div class="offer-main">
@@ -77,7 +57,7 @@
                   <strong>{{ voucher.title }}</strong>
                   <div class="offer-badges">
                     <span class="voucher-badge" :class="isSeckillVoucher(voucher) ? 'is-seckill' : 'is-normal'">
-                      {{ isSeckillVoucher(voucher) ? '秒杀券' : '普通券' }}
+                      {{ isSeckillVoucher(voucher) ? '限时抢购' : '直接购买' }}
                     </span>
                     <span class="voucher-badge is-light" :class="voucherStatusClass(voucher)">
                       {{ getVoucherStatusText(voucher) }}
@@ -86,6 +66,11 @@
                 </div>
                 <span>支付 ¥{{ formatMoney(voucher.payValue) }} / 抵扣 ¥{{ formatMoney(voucher.actualValue) }}</span>
                 <span>{{ formatVoucherMeta(voucher) }}</span>
+                <span v-if="voucher.subTitle">{{ voucher.subTitle }}</span>
+                <details class="voucher-rules">
+                  <summary>查看使用规则</summary>
+                  <p>{{ voucher.rules || '使用规则暂未提供，请先确认适用范围。' }}</p>
+                </details>
               </div>
               <div class="offer-actions">
                 <el-button
@@ -99,17 +84,17 @@
                 </el-button>
               </div>
             </div>
-            <div v-if="!vouchers.length" class="empty-block">暂无可领取优惠券</div>
+            <div v-if="!vouchers.length" class="empty-block">此地点暂无可购买的器材券</div>
           </div>
 
           <div v-if="latestOrderId" class="payment-box">
             <strong>当前订单：{{ latestOrderId }}</strong>
-            <span class="order-status-text">{{ orderReady ? '订单已落库，可继续支付' : '订单创建中，请稍候后再支付' }}</span>
+            <span class="order-status-text">{{ orderReady ? '订单已创建，可继续模拟支付' : '订单创建中，请稍候后再支付' }}</span>
             <div class="payment-actions">
               <el-button size="small" :loading="checkingOrder" @click="checkPaymentStatus">查状态</el-button>
               <el-button size="small" :disabled="!orderReady" :loading="paying" @click="simulatePayment">模拟支付</el-button>
-              <el-button size="small" :disabled="!orderReady" :loading="paying" @click="openPayUrl('alipay')">支付宝</el-button>
-              <el-button size="small" :disabled="!orderReady" :loading="paying" @click="openPayUrl('wechat')">微信</el-button>
+              <el-button size="small" :disabled="!orderReady" :loading="paying" @click="openPayUrl('alipay')">支付宝（演示）</el-button>
+              <el-button size="small" :disabled="!orderReady" :loading="paying" @click="openPayUrl('wechat')">微信（演示）</el-button>
             </div>
           </div>
         </article>
@@ -117,10 +102,14 @@
 
       <section class="card-panel comments-panel">
         <div class="section-title">
-          <h2>用户评论</h2>
+          <h2>摄影笔记</h2>
           <p>{{ commentTip }}</p>
         </div>
-        <CommentItem v-for="comment in detail.comments" :key="comment.id" :comment="comment" />
+        <article v-for="note in detail.comments" :key="note.id" class="place-note">
+          <h3>{{ note.title }}</h3><span class="tag-chip">{{ note.user }}</span><p>{{ note.content }}</p>
+          <div class="note-images"><img v-for="image in note.images" :key="image" :src="image" :alt="note.title" loading="lazy" /></div>
+        </article>
+        <p v-if="!detail.comments.length" class="empty-block">当前热门笔记中未找到此地点的关联内容。</p>
       </section>
     </div>
   </div>
@@ -129,25 +118,20 @@
 <script setup>
 import { ElMessage } from 'element-plus';
 import { ArrowLeft } from '@element-plus/icons-vue';
-import CommentItem from '@/components/common/CommentItem.vue';
 import { shopApi } from '@/api/modules/shop';
 import { voucherApi } from '@/api/modules/voucher';
 import { paymentApi } from '@/api/modules/payment';
 import { blogApi } from '@/api/modules/blog';
-import { aiApi } from '@/api/modules/ai';
-import { useAiStore } from '@/store/ai';
 import { useUserStore } from '@/store/user';
 
 const route = useRoute();
 const router = useRouter();
-const aiStore = useAiStore();
 const userStore = useUserStore();
 const detail = ref(null);
+const canNavigate = computed(() => Boolean(detail.value?.address) && !detail.value.address.includes('虚构演示地点'));
 const vouchers = ref([]);
 const latestOrderId = ref(null);
 const latestOrderMeta = ref(null);
-const usedRealComments = ref(false);
-const usedAiInsight = ref(false);
 const orderReady = ref(false);
 const ordering = ref(false);
 const paying = ref(false);
@@ -161,23 +145,20 @@ const carouselImages = computed(() => {
     .slice(0, 3);
 });
 
-const dishTip = computed(() => (usedAiInsight.value ? '优先展示 AI 店铺分析得到的招牌菜结果' : '当前后端暂无菜品接口，这里展示本地演示数据'));
-const commentTip = computed(() => (usedRealComments.value ? '优先展示真实探店笔记内容作为门店评论' : '当前后端评论接口未实现，这里展示 mock 评论'));
+const commentTip = '从热门笔记中展示与此地点关联的内容，暂不代表全部笔记。';
 
 onMounted(loadDetail);
 
 async function loadDetail() {
   try {
     const shopDetail = await shopApi.getDetail(route.params.id);
-    const [voucherList, insight, shopBlogs] = await Promise.all([
+    const [voucherList, shopBlogs] = await Promise.all([
       voucherApi.listByShop(route.params.id).catch(() => []),
-      aiApi.analyzeShop(route.params.id).catch(() => null),
       loadShopBlogs(route.params.id)
     ]);
 
-    detail.value = mergeDetail(shopDetail, insight, shopBlogs);
+    detail.value = mergeDetail(shopDetail, shopBlogs);
     vouchers.value = voucherList;
-    aiStore.setCurrentShop(detail.value);
     const latestOrder = findLatestOrder(detail.value.id);
     latestOrderId.value = latestOrder?.orderId || null;
     latestOrderMeta.value = latestOrder || null;
@@ -189,7 +170,7 @@ async function loadDetail() {
       }
     }
   } catch (error) {
-    ElMessage.error(error?.message || '加载商家详情失败');
+    ElMessage.error(error?.message || '加载地点详情失败');
   }
 }
 
@@ -205,42 +186,11 @@ async function loadShopBlogs(shopId) {
   return [...uniqueMap.values()].slice(0, 3);
 }
 
-function mergeDetail(baseDetail, insight, shopBlogs) {
-  const nextDetail = {
-    ...baseDetail,
-    dishes: baseDetail.dishes,
-    comments: baseDetail.comments,
-    recommendText: baseDetail.recommendText
-  };
-
-  if (Array.isArray(shopBlogs) && shopBlogs.length) {
-    nextDetail.comments = shopBlogs.map((blog) => ({
-      id: blog.id,
-      user: blog.name || '匿名用户',
-      avatar: blog.icon || 'https://dummyimage.com/80x80/ffb36d/ffffff&text=U',
-      score: calculateBlogScore(blog),
-      content: blog.content || blog.title || '这位用户没有留下更多文字评价。',
-      images: parseImages(blog.images)
-    }));
-    usedRealComments.value = true;
-  } else {
-    usedRealComments.value = false;
-  }
-
-  if (insight?.signatureDishes?.length) {
-    nextDetail.dishes = insight.signatureDishes.map((name, index) => ({
-      name,
-      price: baseDetail.price,
-      desc: index === 0 ? insight.summary || 'AI 认为这是当前门店最值得尝试的菜品。' : `AI 推荐指数 Top ${index + 1}`,
-      image: baseDetail.cover
-    }));
-    nextDetail.recommendText = insight.summary || baseDetail.recommendText;
-    usedAiInsight.value = true;
-  } else {
-    usedAiInsight.value = false;
-  }
-
-  return nextDetail;
+function mergeDetail(baseDetail, shopBlogs) {
+  return { ...baseDetail, comments: shopBlogs.map(blog => ({
+    id: blog.id, user: blog.name || '摄影爱好者', title: blog.title || '摄影笔记',
+    content: blog.content || '', images: parseImages(blog.images)
+  })) };
 }
 
 function parseImages(images) {
@@ -251,14 +201,7 @@ function parseImages(images) {
     .slice(0, 3);
 }
 
-function calculateBlogScore(blog) {
-  const liked = Number(blog?.liked || 0);
-  if (liked >= 100) return 5;
-  if (liked >= 50) return 4.8;
-  if (liked >= 20) return 4.6;
-  if (liked >= 5) return 4.3;
-  return 4;
-}
+
 
 function findLatestOrder(shopId) {
   const orders = userStore.orderHistory.filter((item) => Number(item.shopId) === Number(shopId));
@@ -275,11 +218,7 @@ function openNavigation() {
   window.open(`https://uri.amap.com/search?keyword=${keyword}`, '_blank');
 }
 
-async function askAiForShop() {
-  aiStore.setCurrentShop(detail.value);
-  aiStore.openDrawer();
-  await aiStore.sendShopInsight(detail.value);
-}
+
 
 function isSeckillVoucher(voucher) {
   return Number(voucher?.type) === 1;
@@ -339,9 +278,10 @@ function getVoucherActionText(voucher) {
 
 function formatVoucherMeta(voucher) {
   if (isSeckillVoucher(voucher)) {
-    return `秒杀券 ｜ 库存 ${voucher.stock ?? '不限'} ｜ ${voucher.beginTime || '即时生效'}`;
+    const begin = voucher.beginTime ? String(voucher.beginTime).replace('T', ' ').slice(0, 16) : '开始时间未提供';
+    return `限时抢购 ｜ 剩余券名额 ${voucher.stock ?? '未提供'} ｜ ${begin} 开始`;
   }
-  return '普通券 ｜ 即时购买 ｜ 下单后可直接支付';
+  return '直接购买 ｜ 即时购买 ｜ 下单后可直接支付';
 }
 
 function isAsyncPendingOrder(order) {
@@ -397,9 +337,9 @@ async function buyVoucher(voucher) {
       actualAmount: formatMoney(voucher.actualValue),
       status: 1
     });
-    ElMessage.success(`普通券下单成功，订单ID：${latestOrderId.value}，可以直接支付`);
+    ElMessage.success(`直接购买下单成功，订单ID：${latestOrderId.value}，可以直接支付`);
   } catch (error) {
-    ElMessage.error(error?.message || '普通券购买失败');
+    ElMessage.error(error?.message || '购券失败');
   } finally {
     ordering.value = false;
   }
@@ -735,3 +675,20 @@ function wait(duration) {
 }
 </style>
 
+
+<style scoped>
+.content-grid { grid-template-columns:1fr; }
+.detail-placeholder { min-height:300px; display:grid; place-items:center; background:#e9eee3; color:#607260; border-radius:14px; letter-spacing:2px; }
+.place-note { padding:20px 0; border-top:1px solid var(--dp-border); }
+.place-note p,.voucher-rules { white-space:pre-wrap; line-height:1.9; overflow-wrap:anywhere; }
+.note-images { display:flex; flex-wrap:wrap; gap:12px; }
+.note-images img { width:180px; max-width:100%; height:140px; object-fit:cover; border-radius:12px; }
+.offer-item { background:#f0f3eb; color:#355940; }
+.offer-main span { color:#496250; }
+.voucher-badge.is-seckill { background:var(--dp-primary); }
+.voucher-badge.is-normal { color:var(--dp-primary); background:var(--dp-primary-light); }
+.voucher-rules { color:#496250; font-size:13px; }
+.voucher-rules summary { width:fit-content; cursor:pointer; font-weight:600; }
+.voucher-rules p { margin:10px 0 0; }
+@media(max-width:600px) { .hero { grid-template-columns:1fr; } .offer-item { grid-template-columns:1fr; } }
+</style>
