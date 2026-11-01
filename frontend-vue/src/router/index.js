@@ -5,6 +5,8 @@ import ShopDetailPage from '@/pages/shop/ShopDetailPage.vue';
 import ProfilePage from '@/pages/profile/ProfilePage.vue';
 import BlogDetailPage from '@/pages/blog/BlogDetailPage.vue';
 import SectionPendingPage from '@/pages/common/SectionPendingPage.vue';
+import OffersPage from '@/pages/offers/OffersPage.vue';
+import AiAssistantPage from '@/pages/ai/AiAssistantPage.vue';
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -42,7 +44,7 @@ const router = createRouter({
     {
       path: '/offers',
       name: 'offers',
-      component: SectionPendingPage,
+      component: OffersPage,
       meta: { title: '优惠活动' }
     },
     {
@@ -60,8 +62,8 @@ const router = createRouter({
     {
       path: '/ai-assistant',
       name: 'ai-assistant',
-      redirect: '/',
-      meta: { tab: 'ai', title: 'AI助手' }
+      component: AiAssistantPage,
+      meta: { tab: 'ai', title: '摄影助手' }
     }
   ],
   scrollBehavior() {

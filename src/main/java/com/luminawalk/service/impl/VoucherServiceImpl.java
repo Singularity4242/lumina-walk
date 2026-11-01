@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.annotation.Resource;
 import java.util.List;
+import java.util.Map;
 
 import static com.luminawalk.utils.RedisConstants.SECKILL_STOCK_KEY;
 /**
@@ -22,6 +23,8 @@ import static com.luminawalk.utils.RedisConstants.SECKILL_STOCK_KEY;
  */
 @Service
 public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> implements IVoucherService {
+
+    private static final int OFFERS_PAGE_SIZE = 12;
 
     @Resource
     private ISeckillVoucherService seckillVoucherService;
@@ -51,5 +54,17 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
         seckillVoucherService.save(seckillVoucher);
         // 秒杀库存保存到redis
         stringRedisTemplate.opsForValue().set(SECKILL_STOCK_KEY + voucher.getId(), voucher.getStock().toString());
+    }
+
+    @Override
+    public Result queryOffers(Integer current) {
+        if (current == null || current < 1) {
+            return Result.fail("页码必须大于等于1");
+        }
+        long offset = (current.longValue() - 1) * OFFERS_PAGE_SIZE;
+        List<Voucher> vouchers = getBaseMapper().queryOffers(offset, OFFERS_PAGE_SIZE + 1);
+        boolean hasMore = vouchers.size() > OFFERS_PAGE_SIZE;
+        return Result.ok(Map.of("records", hasMore ? vouchers.subList(0, OFFERS_PAGE_SIZE) : vouchers,
+                "hasMore", hasMore));
     }
 }

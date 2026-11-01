@@ -288,7 +288,7 @@ function isAsyncPendingOrder(order) {
   if (!order) return false;
   const asyncCreated = order.asyncCreated === true;
   const seckillType = Number(order.voucherType) === 1;
-  return (asyncCreated || seckillType) && Number(order.status ?? 1) === 1;
+  return (asyncCreated || seckillType) && [0, 1].includes(Number(order.status ?? 1));
 }
 
 async function submitVoucherOrder(voucher) {
@@ -500,6 +500,7 @@ function formatMoney(value) {
 
 function formatOrderStatus(status) {
   switch (Number(status)) {
+    case 0: return '订单创建中';
     case 1: return '待支付';
     case 2: return '已支付';
     case 3: return '已核销';

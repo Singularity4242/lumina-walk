@@ -37,7 +37,8 @@ const navItems = [
   { label: '宝藏地点', path: '/category' },
   { label: '器材', path: '/gear' },
   { label: '专业影棚', path: '/studios' },
-  { label: '优惠活动', path: '/offers' }
+  { label: '优惠活动', path: '/offers' },
+  { label: '摄影助手', path: '/ai-assistant' }
 ];
 
 function isActive(path) {
@@ -69,7 +70,7 @@ function handleUserClick() {
 .user-entry:hover { background:#333; }
 .user-entry:active { transform:translateY(1px); }
 .user-name { max-width:88px; overflow:hidden; text-overflow:ellipsis; font-size:14px; font-weight:650; }
-@media(max-width:900px) {
+@media(max-width:1100px) {
   .header-inner { width:calc(100% - 28px); grid-template-columns:1fr auto; gap:0 12px; min-height:0; padding-top:12px; }
   .brand { font-size:16px; }
   .brand-mark { width:28px; height:28px; }

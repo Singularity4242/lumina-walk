@@ -128,7 +128,9 @@ public class AiAgentServiceImpl implements AiAgentService {
     @Override
     public ShopInsightResponse analyzeShop(Long shopId) {
         AgentLoopRequest loopRequest = new AgentLoopRequest();
-        loopRequest.setPrompt("请分析店铺ID=" + shopId + " 的真实评价，重点关注招牌菜、环境和服务");
+        loopRequest.setPrompt("请整理地点ID=" + shopId
+                + " 的真实地点资料与关联摄影笔记，概括有依据的拍摄或服务经验，并保留实际来源标识。"
+                + "无关联笔记时只总结地点资料，不声称综合用户口碑；开放时间、费用、进入方式或拍摄限制缺失时明确说明，不自行推断。");
         loopRequest.setShopId(shopId);
         AgentLoopResult loopResult = agentLoopExecutor.execute(loopRequest);
 

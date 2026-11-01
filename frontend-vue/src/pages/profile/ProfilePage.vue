@@ -399,6 +399,7 @@ function goShop(shopId) {
 
 function formatOrderStatus(status) {
   switch (Number(status)) {
+    case 0: return '订单创建中';
     case 1: return '待支付';
     case 2: return '已支付';
     case 3: return '已核销';

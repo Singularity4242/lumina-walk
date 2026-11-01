@@ -37,29 +37,29 @@ function parseSseBlock(block) {
 }
 
 export const aiApi = {
-  createConversation() {
+  createConversation(signal) {
     return request({
       url: '/ai/agent/conversations',
-      method: 'post'
+      method: 'post', signal
     });
   },
-  listConversations() {
+  listConversations(signal) {
     return request({
       url: '/ai/agent/conversations',
-      method: 'get'
+      method: 'get', signal
     });
   },
-  getMessages(conversationId) {
+  getMessages(conversationId, signal) {
     return request({
       url: `/ai/agent/conversations/${conversationId}/messages`,
-      method: 'get'
+      method: 'get', signal
     });
   },
-  chat(data) {
+  chat(data, signal) {
     return request({
       url: '/ai/agent/chat',
       method: 'post',
-      data
+      data, signal
     });
   },
   recommend(data) {
@@ -75,7 +75,7 @@ export const aiApi = {
       method: 'get'
     });
   },
-  async streamConversation(conversationId, { signal, onEvent } = {}) {
+  async streamConversation(conversationId, { signal, onEvent, onOpen } = {}) {
     const token = localStorage.getItem('hm-dianping-token');
     const response = await fetch(buildApiPath(`/ai/agent/conversations/${conversationId}/stream`), {
       method: 'GET',
@@ -86,33 +86,48 @@ export const aiApi = {
       signal
     });
 
-    if (!response.ok || !response.body) {
+    if (response.status === 401) {
+      localStorage.removeItem('hm-dianping-token');
+      window.dispatchEvent(new CustomEvent('hm-auth-expired'));
+      throw new Error('登录已过期，请重新登录');
+    }
+    if (!response.ok || !response.body || !response.headers.get('content-type')?.includes('text/event-stream')) {
       throw new Error('建立 AI 流式连接失败');
     }
+
+    onOpen?.();
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-      const blocks = buffer.split(/\r?\n\r?\n/g);
-      buffer = blocks.pop() || '';
-
-      blocks
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .forEach((item) => {
-          const parsed = parseSseBlock(item);
-          if (parsed) {
-            onEvent?.(parsed);
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          buffer += decoder.decode();
+          if (buffer.trim()) {
+            const parsed = parseSseBlock(buffer);
+            if (parsed) onEvent?.(parsed);
           }
-        });
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const blocks = buffer.split(/\r?\n\r?\n/g);
+        buffer = blocks.pop() || '';
+
+        blocks
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .forEach((item) => {
+            const parsed = parseSseBlock(item);
+            if (parsed) onEvent?.(parsed);
+          });
+      }
+    } finally {
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
     }
   }
 };
