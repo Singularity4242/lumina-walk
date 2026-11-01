@@ -24,7 +24,7 @@ class AgentLoopExecutorTest {
 
         AgentLoopExecutor executor = new AgentLoopExecutor(manualToolAgentLoopExecutor);
         AgentLoopRequest request = new AgentLoopRequest();
-        request.setPrompt("超级会员有什么福利");
+        request.setPrompt("逆光人像如何曝光");
         request.setHistoryMessages(new ArrayList<>());
 
         AgentLoopResult result = executor.execute(request);

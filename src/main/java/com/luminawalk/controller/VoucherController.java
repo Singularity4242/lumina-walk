@@ -43,4 +43,9 @@ public class VoucherController {
     public Result queryVoucherOfShop(@PathVariable("shopId") Long shopId){
         return voucherService.queryVoucherOfShop(shopId);
     }
+
+    @GetMapping("/offers")
+    public Result queryOffers(@RequestParam(value = "current", defaultValue = "1") Integer current) {
+        return voucherService.queryOffers(current);
+    }
 }

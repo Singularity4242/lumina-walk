@@ -14,4 +14,6 @@ public interface VoucherMapper extends BaseMapper<Voucher> {
     List<Long> selectAllIds(@Param("offset") int offset, @Param("limit") int limit);
 
     List<Voucher> queryVoucherOfShop(@Param("shopId") Long shopId);
+
+    List<Voucher> queryOffers(@Param("offset") long offset, @Param("limit") int limit);
 }

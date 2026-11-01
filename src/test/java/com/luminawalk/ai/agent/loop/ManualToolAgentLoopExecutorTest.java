@@ -5,6 +5,9 @@ import com.luminawalk.ai.agent.prompt.AgentLoopPromptProvider;
 import com.luminawalk.ai.config.AiAgentProperties;
 import com.luminawalk.ai.tool.AgentLoopControlTools;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -24,6 +27,77 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ManualToolAgentLoopExecutorTest {
+
+    @ParameterizedTest
+    @CsvSource({
+            "周末推荐拍人像的地点, true",
+            "推荐拍摄风景的地方, true",
+            "周末推荐摄影地点并核实开放时间, false",
+            "周末推荐摄影地点并查询费用, false",
+            "周末摄影器材券是否包含押金, false",
+            "周末摄影地点实时天气, false",
+            "这个地点适合周末拍照吗, false",
+            "想吃火锅和烧烤, false"
+    })
+    void shouldOnlyNudgeSimplePhotographyRecommendations(String question, boolean expectNudge) {
+        AgentLoopRequest request = new AgentLoopRequest();
+        request.setPrompt(question);
+        assertRecommendationNudge(request, expectNudge);
+    }
+
+    @Test
+    void shouldNotNudgePlaceAnalysisEvenWithRecommendationKeywords() {
+        AgentLoopRequest request = new AgentLoopRequest();
+        request.setPrompt("周末推荐拍摄攻略");
+        request.setShopId(42L);
+        assertRecommendationNudge(request, false);
+    }
+
+    private void assertRecommendationNudge(AgentLoopRequest request, boolean expectNudge) {
+        AgentLoopPromptProvider provider = new AgentLoopPromptProvider();
+        AtomicInteger calls = new AtomicInteger();
+        ChatModel model = prompt -> {
+            if (calls.incrementAndGet() == 1) {
+                assertEquals(provider.systemPrompt(), prompt.getInstructions().get(0).getText());
+                return new ChatResponse(List.of(new Generation(new AssistantMessage("", java.util.Map.of(),
+                        List.of(new AssistantMessage.ToolCall("lookup", "function", "echo", "{\"text\":\"摄影资料\"}"))))));
+            }
+            boolean hasNudge = prompt.getInstructions().stream()
+                    .anyMatch(message -> provider.simpleRecommendationFinishPrompt(request).equals(message.getText()));
+            assertEquals(expectNudge, hasNudge);
+            return new ChatResponse(List.of(new Generation(new AssistantMessage("当前资料不足，请补充所在城市。"))));
+        };
+        AgentLoopToolRegistry registry = new AgentLoopToolRegistry(Arrays.asList(
+                ToolCallbacks.from(new TestLoopTools(), new AgentLoopControlTools())));
+        ManualToolAgentLoopExecutor executor = new ManualToolAgentLoopExecutor(
+                model, registry, provider, new AiAgentProperties(), new ObjectMapper());
+        AgentLoopExecution result = executor.execute(request, new ArrayList<>());
+        assertEquals(AgentLoopStatus.FINISHED, result.getStatus());
+        assertEquals(2, calls.get());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"人像逆光如何曝光？", "周末去哪拍照？", "这张租赁券包含押金吗？"})
+    void shouldAllowAdviceOrClarificationToTerminateWithoutBusinessTools(String question) {
+        AgentLoopPromptProvider provider = new AgentLoopPromptProvider();
+        AgentLoopRequest request = new AgentLoopRequest();
+        request.setPrompt(question);
+        ChatModel model = prompt -> {
+            assertEquals(provider.systemPrompt(), prompt.getInstructions().get(0).getText());
+            assertEquals(provider.buildUserPrompt(request), prompt.getInstructions().get(1).getText());
+            return new ChatResponse(List.of(new Generation(new AssistantMessage("", java.util.Map.of(),
+                    List.of(new AssistantMessage.ToolCall("finish", "function", "terminate",
+                            "{\"answer\":\"请补充必要条件；资料未核实。\",\"reason\":\"工具无法补足\"}"))))));
+        };
+        AgentLoopToolRegistry registry = new AgentLoopToolRegistry(Arrays.asList(
+                ToolCallbacks.from(new AgentLoopControlTools())));
+        ManualToolAgentLoopExecutor executor = new ManualToolAgentLoopExecutor(
+                model, registry, provider, new AiAgentProperties(), new ObjectMapper());
+        AgentLoopExecution result = executor.execute(request, new ArrayList<>());
+        assertEquals(AgentLoopStatus.FINISHED, result.getStatus());
+        assertTrue(result.isTerminatedByTool());
+        assertEquals(1, result.getTotalSteps());
+    }
 
     @Test
     void shouldRetryWhenModelReturnsBlankResponse() {

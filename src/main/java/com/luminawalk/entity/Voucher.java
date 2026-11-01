@@ -30,6 +30,13 @@ public class Voucher implements Serializable {
      */
     private Long shopId;
 
+    /** 关联门店的展示信息，不写入券表。 */
+    @TableField(exist = false)
+    private String shopName;
+
+    @TableField(exist = false)
+    private String shopImages;
+
     /**
      * 代金券标题
      */
